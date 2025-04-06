@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { 
-  Template, 
-  TemplateElement, 
-  Row, 
-  Column, 
+import {
+  Template,
+  TemplateElement,
+  Row,
+  Column,
   ElementType,
   createNewTemplate,
   generateElementId,
@@ -34,6 +34,16 @@ interface TemplateContextProps {
   saveTemplate: () => Promise<void>;
   loadTemplate: (id: number) => Promise<void>;
   updateElementValues: (elementId: string, values: any[]) => void;
+  selectedTableElement: {
+    elementId: string | null;
+    type: 'column' | 'row' | null;
+    id: string | null;
+  } | null;
+  setSelectedTableElement: (data: { elementId: string; type: 'column' | 'row' | null; id: string | null }) => void;
+  updateTableColumnProps: (elementId: string, columnId: string, props: Partial<ElementProps>) => void;
+  updateTableRowProps: (elementId: string, rowId: string, props: Partial<ElementProps>) => void;
+  deleteTableColumn: (elementId: string, columnId: string) => void;
+  deleteTableRow: (elementId: string, rowId: string) => void;
 }
 
 const TemplateContext = createContext<TemplateContextProps | undefined>(undefined);
@@ -42,12 +52,12 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [template, setTemplate] = useState<Template>(createNewTemplate());
   const [selectedElement, setSelectedElement] = useState<TemplateElement | Row | Column | null>(null);
   const { settings } = useAppSettings();
-  const { 
-    addToHistory, 
-    undo, 
-    redo, 
-    canUndo, 
-    canRedo 
+  const {
+    addToHistory,
+    undo,
+    redo,
+    canUndo,
+    canRedo
   } = useTemplateHistory<Template>(template);
 
   // Auto-save feature
@@ -69,19 +79,19 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
         ...props
       }
     };
-    
+
     setTemplate(updatedTemplate);
     addToHistory(updatedTemplate);
   };
 
   const updateElementProps = (elementId: string, props: Partial<ElementProps>) => {
     const updatedTemplate = { ...template };
-    
+
     // Find the element in the template
     for (const column of updatedTemplate.columns) {
       for (const row of column.rows) {
         const elementIndex = row.elements.findIndex(element => element.id === elementId);
-        
+
         if (elementIndex !== -1) {
           row.elements[elementIndex] = {
             ...row.elements[elementIndex],
@@ -90,7 +100,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
               ...props
             }
           };
-          
+
           setTemplate(updatedTemplate);
           addToHistory(updatedTemplate);
           return;
@@ -101,15 +111,15 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const addElement = (type: ElementType, rowId: number, columnId: number) => {
     const updatedTemplate = { ...template };
-    
+
     const column = updatedTemplate.columns.find(c => c.order === columnId);
     if (!column) return;
-    
+
     const row = column.rows.find(r => r.order === rowId);
     if (!row) return;
-    
+
     const id = generateElementId(type, row.elements);
-    
+
     const newElement: TemplateElement = {
       id,
       order: row.elements.length,
@@ -122,9 +132,9 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
         y: 50
       }
     };
-    
+
     row.elements.push(newElement);
-    
+
     setTemplate(updatedTemplate);
     addToHistory(updatedTemplate);
     setSelectedElement(newElement);
@@ -132,26 +142,26 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const removeElement = (elementId: string) => {
     const updatedTemplate = { ...template };
-    
+
     for (const column of updatedTemplate.columns) {
       for (const row of column.rows) {
         const elementIndex = row.elements.findIndex(element => element.id === elementId);
-        
+
         if (elementIndex !== -1) {
           row.elements.splice(elementIndex, 1);
-          
+
           // Recalculate order for remaining elements
           row.elements.forEach((element, idx) => {
             element.order = idx;
           });
-          
+
           setTemplate(updatedTemplate);
           addToHistory(updatedTemplate);
-          
+
           if (selectedElement && 'id' in selectedElement && selectedElement.id === elementId) {
             setSelectedElement(null);
           }
-          
+
           return;
         }
       }
@@ -161,48 +171,48 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
   const moveElement = (elementId: string, newRowId: number, newColumnId: number) => {
     const updatedTemplate = { ...template };
     let elementToMove: TemplateElement | null = null;
-    
+
     // Find and remove the element from its current location
     outerLoop: for (const column of updatedTemplate.columns) {
       for (const row of column.rows) {
         const elementIndex = row.elements.findIndex(element => element.id === elementId);
-        
+
         if (elementIndex !== -1) {
           elementToMove = row.elements[elementIndex];
           row.elements.splice(elementIndex, 1);
-          
+
           // Recalculate order for remaining elements
           row.elements.forEach((element, idx) => {
             element.order = idx;
           });
-          
+
           break outerLoop;
         }
       }
     }
-    
+
     if (!elementToMove) return;
-    
+
     // Add the element to its new location
     const targetColumn = updatedTemplate.columns.find(c => c.order === newColumnId);
     if (!targetColumn) return;
-    
+
     const targetRow = targetColumn.rows.find(r => r.order === newRowId);
     if (!targetRow) return;
-    
+
     elementToMove.order = targetRow.elements.length;
     targetRow.elements.push(elementToMove);
-    
+
     setTemplate(updatedTemplate);
     addToHistory(updatedTemplate);
   };
 
   const addRow = (columnId: number) => {
     const updatedTemplate = { ...template };
-    
+
     const column = updatedTemplate.columns.find(c => c.order === columnId);
     if (!column) return;
-    
+
     const newRow: Row = {
       order: column.rows.length,
       props: {
@@ -213,9 +223,9 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
       },
       elements: []
     };
-    
+
     column.rows.push(newRow);
-    
+
     setTemplate(updatedTemplate);
     addToHistory(updatedTemplate);
     setSelectedElement(newRow);
@@ -223,23 +233,23 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const removeRow = (rowId: number, columnId: number) => {
     const updatedTemplate = { ...template };
-    
+
     const column = updatedTemplate.columns.find(c => c.order === columnId);
     if (!column) return;
-    
+
     const rowIndex = column.rows.findIndex(r => r.order === rowId);
     if (rowIndex === -1) return;
-    
+
     column.rows.splice(rowIndex, 1);
-    
+
     // Recalculate order for remaining rows
     column.rows.forEach((row, idx) => {
       row.order = idx;
     });
-    
+
     setTemplate(updatedTemplate);
     addToHistory(updatedTemplate);
-    
+
     if (selectedElement && 'order' in selectedElement && selectedElement.order === rowId) {
       setSelectedElement(null);
     }
@@ -247,27 +257,27 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const addColumn = () => {
     const updatedTemplate = { ...template };
-    
+
     const newColumn: Column = {
       order: updatedTemplate.columns.length,
       props: {
         height: 100,
         width: 100 / (updatedTemplate.columns.length + 1),
-        x: updatedTemplate.columns.length === 0 ? 50 : 
-           updatedTemplate.columns[updatedTemplate.columns.length - 1].props.x + 
-           updatedTemplate.columns[updatedTemplate.columns.length - 1].props.width / 2,
+        x: updatedTemplate.columns.length === 0 ? 50 :
+          updatedTemplate.columns[updatedTemplate.columns.length - 1].props.x +
+          updatedTemplate.columns[updatedTemplate.columns.length - 1].props.width / 2,
         y: 50
       },
       rows: []
     };
-    
+
     updatedTemplate.columns.push(newColumn);
-    
+
     // Adjust width of existing columns
     updatedTemplate.columns.forEach(column => {
       column.props.width = 100 / updatedTemplate.columns.length;
     });
-    
+
     setTemplate(updatedTemplate);
     addToHistory(updatedTemplate);
     setSelectedElement(newColumn);
@@ -275,21 +285,21 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const removeColumn = (columnId: number) => {
     const updatedTemplate = { ...template };
-    
+
     const columnIndex = updatedTemplate.columns.findIndex(c => c.order === columnId);
     if (columnIndex === -1) return;
-    
+
     updatedTemplate.columns.splice(columnIndex, 1);
-    
+
     // Recalculate order for remaining columns and adjust width
     updatedTemplate.columns.forEach((column, idx) => {
       column.order = idx;
       column.props.width = 100 / updatedTemplate.columns.length;
     });
-    
+
     setTemplate(updatedTemplate);
     addToHistory(updatedTemplate);
-    
+
     if (selectedElement && 'rows' in selectedElement && selectedElement.order === columnId) {
       setSelectedElement(null);
     }
@@ -313,12 +323,12 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
   const saveTemplate = async (): Promise<void> => {
     // Mock implementation, to be replaced with actual API call
     console.log('Saving template:', template);
-    
+
     if (!settings.isAuthenticated) {
       console.warn('Cannot save template: user not authenticated');
       return;
     }
-    
+
     try {
       // Mocked API call
       // await apiService.post('/api/v1/templates', template);
@@ -332,13 +342,13 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
   const loadTemplate = async (id: number): Promise<void> => {
     // Mock implementation, to be replaced with actual API call
     console.log('Loading template with ID:', id);
-    
+
     try {
       // Mocked API call
       // const loadedTemplate = await apiService.get(`/api/v1/templates?id=${id}`);
       // setTemplate(loadedTemplate);
       // addToHistory(loadedTemplate);
-      
+
       // For now, just log that we would load the template
       console.log('Template loaded successfully');
     } catch (error) {
@@ -363,21 +373,197 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const updateElementValues = (elementId: string, values: any[]) => {
     const updatedTemplate = { ...template };
-    
+
     // Find the element in the template
     for (const column of updatedTemplate.columns) {
       for (const row of column.rows) {
         const elementIndex = row.elements.findIndex(element => element.id === elementId);
-        
+
         if (elementIndex !== -1) {
           // Update the element's values
           row.elements[elementIndex] = {
             ...row.elements[elementIndex],
             values: values
           };
-          
+
           setTemplate(updatedTemplate);
           addToHistory(updatedTemplate);
+          return;
+        }
+      }
+    }
+  };
+
+  const [selectedTableElement, setSelectedTableElement] = useState<{
+    elementId: string | null;
+    type: 'column' | 'row' | null;
+    id: string | null;
+  } | null>(null);
+
+  // Table column properties update
+  const updateTableColumnProps = (elementId: string, columnId: string, props: Partial<ElementProps>) => {
+    const updatedTemplate = { ...template };
+
+    // Find the element
+    for (const column of updatedTemplate.columns) {
+      for (const row of column.rows) {
+        const element = row.elements.find(el => el.id === elementId);
+
+        if (element && element.type === 'table' && Array.isArray(element.values) && element.values[0]?.columns) {
+          const tableData = element.values[0];
+
+          // Update the column properties
+          const updatedColumns = tableData.columns.map(col => {
+            if (col.id === columnId) {
+              return {
+                ...col,
+                props: { ...col.props, ...props }
+              };
+            }
+            return col;
+          });
+
+          // Update the table data
+          element.values[0] = {
+            ...tableData,
+            columns: updatedColumns
+          };
+
+          setTemplate(updatedTemplate);
+          addToHistory(updatedTemplate);
+          return;
+        }
+      }
+    }
+  };
+
+  // Table row properties update
+  const updateTableRowProps = (elementId: string, rowId: string, props: Partial<ElementProps>) => {
+    const updatedTemplate = { ...template };
+
+    // Find the element
+    for (const column of updatedTemplate.columns) {
+      for (const row of column.rows) {
+        const element = row.elements.find(el => el.id === elementId);
+
+        if (element && element.type === 'table' && Array.isArray(element.values) && element.values[0]?.rows) {
+          const tableData = element.values[0];
+
+          // Update the row properties
+          const updatedRows = tableData.rows.map(tableRow => {
+            if (tableRow.id === rowId) {
+              return {
+                ...tableRow,
+                props: { ...tableRow.props, ...props }
+              };
+            }
+            return tableRow;
+          });
+
+          // Update the table data
+          element.values[0] = {
+            ...tableData,
+            rows: updatedRows
+          };
+
+          setTemplate(updatedTemplate);
+          addToHistory(updatedTemplate);
+          return;
+        }
+      }
+    }
+  };
+
+  // Delete table column
+  const deleteTableColumn = (elementId: string, columnId: string) => {
+    const updatedTemplate = { ...template };
+
+    // Find the element
+    for (const column of updatedTemplate.columns) {
+      for (const row of column.rows) {
+        const element = row.elements.find(el => el.id === elementId);
+
+        if (element && element.type === 'table' && Array.isArray(element.values) && element.values[0]?.columns) {
+          const tableData = element.values[0];
+
+          // Make sure we don't delete the last column
+          if (tableData.columns.length <= 1) {
+            return;
+          }
+
+          // Filter out the column
+          const filteredColumns = tableData.columns.filter(col => col.id !== columnId);
+
+          // Remove column cells from rows
+          const updatedRows = tableData.rows.map(tableRow => {
+            const { [columnId]: removed, ...restCells } = tableRow.cells;
+            return {
+              ...tableRow,
+              cells: restCells
+            };
+          });
+
+          // Update the table data
+          element.values[0] = {
+            ...tableData,
+            columns: filteredColumns,
+            rows: updatedRows
+          };
+
+          setTemplate(updatedTemplate);
+          addToHistory(updatedTemplate);
+
+          // Clear selection if the deleted column was selected
+          if (selectedTableElement &&
+            selectedTableElement.elementId === elementId &&
+            selectedTableElement.type === 'column' &&
+            selectedTableElement.id === columnId) {
+            setSelectedTableElement(null);
+          }
+
+          return;
+        }
+      }
+    }
+  };
+
+  // Delete table row
+  const deleteTableRow = (elementId: string, rowId: string) => {
+    const updatedTemplate = { ...template };
+
+    // Find the element
+    for (const column of updatedTemplate.columns) {
+      for (const row of column.rows) {
+        const element = row.elements.find(el => el.id === elementId);
+
+        if (element && element.type === 'table' && Array.isArray(element.values) && element.values[0]?.rows) {
+          const tableData = element.values[0];
+
+          // Make sure we don't delete the last row
+          if (tableData.rows.length <= 1) {
+            return;
+          }
+
+          // Filter out the row
+          const filteredRows = tableData.rows.filter(tableRow => tableRow.id !== rowId);
+
+          // Update the table data
+          element.values[0] = {
+            ...tableData,
+            rows: filteredRows
+          };
+
+          setTemplate(updatedTemplate);
+          addToHistory(updatedTemplate);
+
+          // Clear selection if the deleted row was selected
+          if (selectedTableElement &&
+            selectedTableElement.elementId === elementId &&
+            selectedTableElement.type === 'row' &&
+            selectedTableElement.id === rowId) {
+            setSelectedTableElement(null);
+          }
+
           return;
         }
       }
@@ -407,7 +593,13 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
         canRedo,
         saveTemplate,
         loadTemplate,
-        updateElementValues
+        updateElementValues,
+        selectedTableElement,
+        setSelectedTableElement,
+        updateTableColumnProps,
+        updateTableRowProps,
+        deleteTableColumn,
+        deleteTableRow
       }}
     >
       {children}

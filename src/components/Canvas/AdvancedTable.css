@@ -1,0 +1,157 @@
+/* Advanced Table Styles */
+.advanced-table {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+  }
+  
+  .advanced-table table {
+    table-layout: fixed;
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .advanced-table th,
+  .advanced-table td {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  /* Column Header */
+  .column-header-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+  
+  .column-header {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    position: relative;
+  }
+  
+  .column-header input {
+    flex-grow: 1;
+    padding: 4px 30px 4px 4px; /* Make room for action buttons */
+  }
+  
+  .column-actions {
+    position: absolute;
+    right: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  
+  .column-header:hover .column-actions {
+    opacity: 1;
+  }
+  
+  .column-menu-btn,
+  .column-delete-btn {
+    background: none;
+    border: none;
+    padding: 2px;
+    cursor: pointer;
+    font-size: 12px;
+    border-radius: 3px;
+  }
+  
+  .column-menu-btn:hover,
+  .column-delete-btn:hover {
+    background-color: rgba(0,0,0,0.1);
+  }
+  
+  /* Column Resize Handle */
+  .column-resize-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 4px;
+    height: 100%;
+    cursor: col-resize;
+    background-color: transparent;
+  }
+  
+  .column-resize-handle:hover,
+  .column-resize-handle:active {
+    background-color: var(--color-scheme, #4C9AFF);
+  }
+  
+  /* Column Settings Dropdown */
+  .column-settings-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 180px;
+    background-color: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    z-index: 100;
+    padding: 8px;
+  }
+  
+  .settings-item {
+    margin-bottom: 8px;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .settings-item label {
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: #666;
+  }
+  
+  .settings-item select,
+  .settings-item input {
+    padding: 4px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+  }
+  
+  /* Cell styles */
+  .advanced-table td input {
+    border: none;
+    width: 100%;
+    height: 100%;
+    min-height: 24px;
+    padding: 4px;
+    background: transparent;
+  }
+  
+  .advanced-table td input:focus {
+    outline: 2px solid var(--color-scheme, #4C9AFF);
+    outline-offset: -2px;
+  }
+  
+  /* Add buttons styles */
+  .advanced-table button {
+    background-color: #f5f5f5;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  
+  .advanced-table button:hover {
+    background-color: #e0e0e0;
+  }
+  
+  /* Row hover effect */
+  .advanced-table tbody tr:hover {
+    background-color: rgba(0,0,0,0.05);
+  }
+  
+  /* Make sure inputs in elements don't interfere with dragging */
+  .advanced-table input,
+  .advanced-table button,
+  .advanced-table select {
+    pointer-events: auto;
+  }

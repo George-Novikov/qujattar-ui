@@ -4,6 +4,7 @@ import { useTemplate } from '../../context/TemplateContext';
 import ColorPicker from '../UI/ColorPicker';
 import Dropdown from '../UI/Dropdown';
 import Slider from '../UI/Slider';
+import Button from '../UI/Button';
 import './Properties.css';
 
 interface ElementPropertiesProps {
@@ -451,6 +452,267 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({ element }) => {
             />
           </div>
         </div>
+      </div>
+    </div>
+  );
+};
+
+export const TableColumnProperties: React.FC = () => {
+  const { 
+    selectedElement, 
+    selectedTableElement,
+    updateTableColumnProps,
+    deleteTableColumn
+  } = useTemplate();
+  
+  if (!selectedElement || !selectedTableElement || selectedTableElement.type !== 'column') {
+    return null;
+  }
+  
+  // Find the table data
+  const tableData = selectedElement.values[0];
+  if (!tableData || !tableData.columns) {
+    return null;
+  }
+  
+  // Find the column
+  const column = tableData.columns.find(col => col.id === selectedTableElement.id);
+  if (!column) {
+    return null;
+  }
+  
+  // Helper function to update properties
+  const handleUpdateProps = (props: any) => {
+    updateTableColumnProps(selectedElement.id, column.id, props);
+  };
+  
+  return (
+    <div className="element-properties">
+      <div className="properties-section">
+        <h3 className="properties-section-title">Column: {column.name}</h3>
+        <Button 
+          variant="secondary" 
+          size="small"
+          onClick={() => {
+            const newName = prompt('Enter new column name', column.name);
+            if (newName) {
+              const updatedColumn = {...column, name: newName};
+              const updatedColumns = tableData.columns.map(col => 
+                col.id === column.id ? updatedColumn : col
+              );
+              updateTableColumnProps(selectedElement.id, column.id, { name: newName });
+            }
+          }}
+        >
+          Rename
+        </Button>
+        {tableData.columns.length > 1 && (
+          <Button 
+            variant="secondary" 
+            size="small"
+            onClick={() => {
+              if (window.confirm(`Delete column "${column.name}"?`)) {
+                deleteTableColumn(selectedElement.id, column.id);
+              }
+            }}
+          >
+            Delete
+          </Button>
+        )}
+      </div>
+      
+      {/* Size */}
+      <div className="properties-section">
+        <h4 className="properties-section-subtitle">Size</h4>
+        
+        <div className="properties-row">
+          <div className="properties-field">
+            <label>Width</label>
+            <input
+              type="number"
+              value={column.props.width || 100}
+              onChange={(e) => handleUpdateProps({ width: parseFloat(e.target.value) })}
+              min="20"
+              max="500"
+            />
+          </div>
+        </div>
+      </div>
+      
+      {/* Appearance */}
+      <div className="properties-section">
+        <h4 className="properties-section-subtitle">Appearance</h4>
+        
+        <div className="properties-row">
+          <div className="properties-field">
+            <ColorPicker
+              label="Background"
+              value={column.props.background || 'transparent'}
+              onChange={(background) => handleUpdateProps({ background })}
+            />
+          </div>
+        </div>
+        
+        <div className="properties-row">
+          <div className="properties-field">
+            <ColorPicker
+              label="Text Color"
+              value={column.props.color || '#000000'}
+              onChange={(color) => handleUpdateProps({ color })}
+            />
+          </div>
+        </div>
+      </div>
+      
+      {/* Text formatting */}
+      <div className="properties-section">
+        <h4 className="properties-section-subtitle">Text Formatting</h4>
+        
+        <div className="properties-row">
+          <div className="properties-field">
+            <label>Horizontal Alignment</label>
+            <Dropdown
+              options={[
+                { value: 'left', label: 'Left' },
+                { value: 'center', label: 'Center' },
+                { value: 'right', label: 'Right' }
+              ]}
+              value={column.props.horizontalAlignment || 'left'}
+              onChange={(value) => handleUpdateProps({ horizontalAlignment: value })}
+            />
+          </div>
+        </div>
+        
+        <div className="properties-row">
+          <div className="properties-field">
+            <label>Font Weight</label>
+            <Dropdown
+              options={[
+                { value: 'normal', label: 'Normal' },
+                { value: 'bold', label: 'Bold' }
+              ]}
+              value={column.props.fontWeight || 'normal'}
+              onChange={(value) => handleUpdateProps({ fontWeight: value })}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const TableRowProperties: React.FC = () => {
+  const { 
+    selectedElement, 
+    selectedTableElement,
+    updateTableRowProps,
+    deleteTableRow
+  } = useTemplate();
+  
+  if (!selectedElement || !selectedTableElement || selectedTableElement.type !== 'row') {
+    return null;
+  }
+  
+  // Find the table data
+  const tableData = selectedElement.values[0];
+  if (!tableData || !tableData.rows) {
+    return null;
+  }
+  
+  // Find the row
+  const row = tableData.rows.find(r => r.id === selectedTableElement.id);
+  if (!row) {
+    return null;
+  }
+  
+  // Helper function to update properties
+  const handleUpdateProps = (props: any) => {
+    updateTableRowProps(selectedElement.id, row.id, props);
+  };
+  
+  return (
+    <div className="element-properties">
+      <div className="properties-section">
+        <h3 className="properties-section-title">Table Row</h3>
+        {tableData.rows.length > 1 && (
+          <Button 
+            variant="secondary" 
+            size="small"
+            onClick={() => {
+              if (window.confirm("Delete this row?")) {
+                deleteTableRow(selectedElement.id, row.id);
+              }
+            }}
+          >
+            Delete
+          </Button>
+        )}
+      </div>
+      
+      {/* Size */}
+      <div className="properties-section">
+        <h4 className="properties-section-subtitle">Size</h4>
+        
+        <div className="properties-row">
+          <div className="properties-field">
+            <label>Height (px)</label>
+            <input
+              type="number"
+              value={row.props.height || 30}
+              onChange={(e) => handleUpdateProps({ height: parseFloat(e.target.value) })}
+              min="20"
+              max="200"
+            />
+          </div>
+        </div>
+      </div>
+      
+      {/* Appearance */}
+      <div className="properties-section">
+        <h4 className="properties-section-subtitle">Appearance</h4>
+        
+        <div className="properties-row">
+          <div className="properties-field">
+            <ColorPicker
+              label="Background"
+              value={row.props.background || 'transparent'}
+              onChange={(background) => handleUpdateProps({ background })}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// In your Properties.tsx component, add this conditional rendering:
+
+const Properties: React.FC = () => {
+  const { selectedElement, selectedTableElement } = useTemplate();
+  const { settings } = useAppSettings();
+  
+  if (!settings.showProperties) {
+    return null;
+  }
+  
+  return (
+    <div className="properties">
+      <div className="properties-header">
+        <span>Properties</span>
+      </div>
+      
+      <div className="properties-content">
+        {selectedTableElement ? (
+          selectedTableElement.type === 'column' ? (
+            <TableColumnProperties />
+          ) : (
+            <TableRowProperties />
+          )
+        ) : selectedElement ? (
+          <ElementProperties element={selectedElement} />
+        ) : (
+          <TemplateProperties template={template} />
+        )}
       </div>
     </div>
   );

@@ -132,3 +132,26 @@ export const generateElementId = (type: ElementType, elements: TemplateElement[]
   const nextIndex = typeElements.length + 1;
   return `${type}-${nextIndex}`;
 };
+
+export interface TableColumn {
+  id: string;
+  name: string;
+  order: number;
+  props: ElementProps;
+}
+
+export interface TableRow {
+  id: string;
+  order: number;
+  props: ElementProps;
+  cells: { [columnId: string]: string };
+}
+
+export interface TableElementData {
+  columns: TableColumn[];
+  rows: TableRow[];
+  settings: {
+    borders: boolean;
+    headerRow: boolean;
+  };
+}

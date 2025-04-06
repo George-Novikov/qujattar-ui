@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { TemplateElement } from '../../models/Template';
 import { useResizable } from '../../hooks/useResizable';
 import { useTemplate } from '../../context/TemplateContext';
+import AdvancedTableElement from './AdvancedTableElement';
 import './Canvas.css';
 
 interface CanvasElementProps {
@@ -180,11 +181,11 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
     }
 
     // Prevent dragging when interacting with table inputs
-    if (element.type === 'table' && 
-        (e.target instanceof HTMLInputElement || 
-         e.target instanceof HTMLButtonElement ||
-         (e.target as HTMLElement).tagName.toLowerCase() === 'td' || 
-         (e.target as HTMLElement).tagName.toLowerCase() === 'th')) {
+    if (element.type === 'table' &&
+      (e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLButtonElement ||
+        (e.target as HTMLElement).tagName.toLowerCase() === 'td' ||
+        (e.target as HTMLElement).tagName.toLowerCase() === 'th')) {
       return;
     }
 
@@ -228,11 +229,11 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
   // Handle double click to edit
   const handleDoubleClick = (e: React.MouseEvent) => {
     // Prevent editing when clicking on table inputs
-    if (element.type === 'table' && 
-        (e.target instanceof HTMLInputElement || 
-         e.target instanceof HTMLButtonElement ||
-         (e.target as HTMLElement).tagName.toLowerCase() === 'td' || 
-         (e.target as HTMLElement).tagName.toLowerCase() === 'th')) {
+    if (element.type === 'table' &&
+      (e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLButtonElement ||
+        (e.target as HTMLElement).tagName.toLowerCase() === 'td' ||
+        (e.target as HTMLElement).tagName.toLowerCase() === 'th')) {
       return;
     }
 
@@ -255,7 +256,7 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
       ...row,
       [newColName]: ''
     }));
-    
+
     setTableData(newData);
     setTimeout(() => {
       updateElementValues(element.id, newData);
@@ -265,7 +266,7 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
   // Add a row to table
   const addTableRow = () => {
     let newData;
-    
+
     if (tableData.length === 0) {
       newData = [{ col1: '', col2: '' }];
     } else {
@@ -275,7 +276,7 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
       });
       newData = [...tableData, newRow];
     }
-    
+
     setTableData(newData);
     setTimeout(() => {
       updateElementValues(element.id, newData);
@@ -288,7 +289,7 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
     if (newData[rowIndex]) {
       newData[rowIndex] = { ...newData[rowIndex], [columnKey]: value };
       setTableData(newData);
-      
+
       // Update after state change using setTimeout
       setTimeout(() => {
         updateElementValues(element.id, newData);
@@ -299,7 +300,7 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
   // Rename table column
   const renameTableColumn = (oldKey: string, newKey: string) => {
     if (!newKey.trim()) newKey = oldKey;
-    
+
     const newData = tableData.map(row => {
       const newRow = {};
       Object.entries(row).forEach(([k, v]) => {
@@ -311,9 +312,9 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
       });
       return newRow;
     });
-    
+
     setTableData(newData);
-    
+
     // Update after state change using setTimeout
     setTimeout(() => {
       updateElementValues(element.id, newData);
@@ -406,6 +407,33 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
     }
   };
 
+  const createDefaultTableData = (element) => {
+    // Create default table structure
+    return {
+      columns: [
+        { id: 'col_0', name: 'Column 1', order: 0, props: { width: 100 } },
+        { id: 'col_1', name: 'Column 2', order: 1, props: { width: 100 } }
+      ],
+      rows: [
+        {
+          id: 'row_0',
+          order: 0,
+          props: { height: 30 },
+          cells: { 'col_0': '', 'col_1': '' }
+        }
+      ],
+      settings: {
+        borders: true,
+        headerRow: true
+      }
+    };
+  };
+
+  // And add this to access the context functions:
+  const {
+    setSelectedTableElement
+  } = useTemplate();
+
   // Render content in view mode
   const renderViewContent = () => {
     switch (element.type) {
@@ -459,106 +487,202 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
 
       case 'table':
         return (
-          <div 
+          <div
             ref={tableEditRef}
             className="element-content table-element"
             onClick={(e) => e.stopPropagation()}
           >
-            {tableData.length > 0 ? (
-              <div className="table-container">
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      {Object.keys(tableData[0] || {}).map((key, index) => (
-                        <th key={`header-${index}`} style={{ border: '1px solid #ccc', padding: '0' }}>
-                          <input
-                            type="text"
-                            defaultValue={key}
-                            onBlur={(e) => {
-                              if (e.target.value !== key) {
-                                renameTableColumn(key, e.target.value);
-                              }
+            {(() => {
+              // Convert the element values to our structured format if needed
+              const tableData = Array.isArray(element.values) && element.values[0]?.columns
+                ? element.values[0]
+                : createDefaultTableData(element);
+
+              // Calculate column widths
+              const totalWidth = tableData.columns.reduce((sum, col) =>
+                sum + (col.props.width || 100), 0);
+
+              // Track which elements are selected
+              const { selectedTableElement } = useTemplate();
+
+              return (
+                <div className="hierarchical-table">
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <colgroup>
+                      {tableData.columns.map(column => (
+                        <col
+                          key={column.id}
+                          style={{ width: `${((column.props.width || 100) / totalWidth) * 100}%` }}
+                        />
+                      ))}
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        {tableData.columns.map((column) => (
+                          <th
+                            key={column.id}
+                            className={selectedTableElement?.elementId === element.id &&
+                              selectedTableElement?.type === 'column' &&
+                              selectedTableElement?.id === column.id
+                              ? 'selected-column' : ''}
+                            style={{
+                              padding: '4px',
+                              border: tableData.settings.borders ? '1px solid #ccc' : 'none',
+                              backgroundColor: column.props.background || 'transparent',
+                              color: column.props.color || 'inherit',
+                              textAlign: column.props.horizontalAlignment || 'left',
+                              fontWeight: column.props.fontWeight || 'bold',
+                              position: 'relative'
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              (e.target as HTMLInputElement).select();
+                              setSelectedTableElement({
+                                elementId: element.id,
+                                type: 'column',
+                                id: column.id
+                              });
                             }}
-                            style={{ 
-                              width: '100%', 
-                              textAlign: 'center', 
-                              fontWeight: 'bold',
-                              border: 'none',
-                              padding: '4px',
-                              background: 'transparent'
-                            }}
-                          />
-                        </th>
-                      ))}
-                      <th style={{ width: '30px', padding: '0' }}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            addTableColumn();
-                          }}
-                          style={{ width: '100%', padding: '2px' }}
-                        >+</button>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tableData.map((row, rowIndex) => (
-                      <tr key={`row-${rowIndex}`}>
-                        {Object.entries(row).map(([key, value], colIndex) => (
-                          <td key={`cell-${rowIndex}-${colIndex}`} style={{ border: '1px solid #ccc', padding: '0' }}>
-                            <input
-                              type="text"
-                              defaultValue={value as string}
-                              onBlur={(e) => {
-                                if (e.target.value !== value) {
-                                  updateTableCell(rowIndex, key, e.target.value);
-                                }
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                (e.target as HTMLInputElement).select();
-                              }}
-                              style={{ 
-                                width: '100%', 
-                                border: 'none',
-                                padding: '4px',
-                                background: 'transparent'
-                              }}
-                            />
-                          </td>
+                          >
+                            {column.name}
+                          </th>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div style={{ marginTop: '5px' }}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      addTableRow();
-                    }}
-                    style={{ width: '100%', padding: '2px' }}
-                  >
-                    + Add Row
-                  </button>
+                    </thead>
+                    <tbody>
+                      {tableData.rows.map((row) => (
+                        <tr
+                          key={row.id}
+                          className={selectedTableElement?.elementId === element.id &&
+                            selectedTableElement?.type === 'row' &&
+                            selectedTableElement?.id === row.id
+                            ? 'selected-row' : ''}
+                          style={{
+                            height: `${row.props.height || 30}px`,
+                            backgroundColor: row.props.background || 'transparent'
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedTableElement({
+                              elementId: element.id,
+                              type: 'row',
+                              id: row.id
+                            });
+                          }}
+                        >
+                          {tableData.columns.map((column) => (
+                            <td
+                              key={`${row.id}-${column.id}`}
+                              style={{
+                                border: tableData.settings.borders ? '1px solid #ccc' : 'none',
+                                padding: '0'
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <input
+                                type="text"
+                                defaultValue={row.cells[column.id] || ''}
+                                onBlur={(e) => {
+                                  const newValue = e.target.value;
+
+                                  // Update the cell value
+                                  const updatedRows = tableData.rows.map(r => {
+                                    if (r.id === row.id) {
+                                      return {
+                                        ...r,
+                                        cells: { ...r.cells, [column.id]: newValue }
+                                      };
+                                    }
+                                    return r;
+                                  });
+
+                                  // Update the element values
+                                  updateElementValues(element.id, [{
+                                    ...tableData,
+                                    rows: updatedRows
+                                  }]);
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  (e.target as HTMLInputElement).select();
+                                }}
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  border: 'none',
+                                  padding: '4px',
+                                  background: 'transparent',
+                                  textAlign: column.props.horizontalAlignment || 'left'
+                                }}
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="table-actions" style={{ marginTop: '5px', display: 'flex', gap: '5px' }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+
+                        // Create a new column
+                        const newColumnId = `col_${tableData.columns.length}`;
+                        const newColumn = {
+                          id: newColumnId,
+                          name: `Column ${tableData.columns.length + 1}`,
+                          order: tableData.columns.length,
+                          props: { width: 100 }
+                        };
+
+                        // Add cells for this column to all rows
+                        const updatedRows = tableData.rows.map(r => ({
+                          ...r,
+                          cells: { ...r.cells, [newColumnId]: '' }
+                        }));
+
+                        // Update the element values
+                        updateElementValues(element.id, [{
+                          ...tableData,
+                          columns: [...tableData.columns, newColumn],
+                          rows: updatedRows
+                        }]);
+                      }}
+                    >
+                      Add Column
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+
+                        // Create a new row
+                        const newRowId = `row_${tableData.rows.length}`;
+
+                        // Create cells for all columns
+                        const cells = {};
+                        tableData.columns.forEach(col => {
+                          cells[col.id] = '';
+                        });
+
+                        const newRow = {
+                          id: newRowId,
+                          order: tableData.rows.length,
+                          props: { height: 30 },
+                          cells
+                        };
+
+                        // Update the element values
+                        updateElementValues(element.id, [{
+                          ...tableData,
+                          rows: [...tableData.rows, newRow]
+                        }]);
+                      }}
+                    >
+                      Add Row
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="empty-placeholder">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    addTableRow();
-                  }}
-                >
-                  Create Table
-                </button>
-              </div>
-            )}
+              );
+            })()}
           </div>
         );
 
