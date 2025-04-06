@@ -1,0 +1,663 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { TemplateElement } from '../../models/Template';
+import { useResizable } from '../../hooks/useResizable';
+import { useTemplate } from '../../context/TemplateContext';
+import './Canvas.css';
+
+interface CanvasElementProps {
+  element: TemplateElement;
+  rowId: number;
+  columnId: number;
+  isSelected: boolean;
+  onClick: () => void;
+}
+
+const CanvasElement: React.FC<CanvasElementProps> = ({
+  element,
+  rowId,
+  columnId,
+  isSelected,
+  onClick
+}) => {
+  const { updateElementProps, updateElementValues } = useTemplate();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const [tableData, setTableData] = useState<any[]>([]);
+  const tableEditRef = useRef<HTMLDivElement>(null);
+
+  // Set up resizable behavior
+  const { size, position, isResizing, elementRef, startResize } = useResizable(
+    {
+      width: element.props.width || 10,
+      height: element.props.height || 10
+    },
+    {
+      x: element.props.x || 50,
+      y: element.props.y || 50
+    },
+    (newSize, newPosition) => {
+      updateElementProps(element.id, {
+        width: newSize.width,
+        height: newSize.height,
+        x: newPosition.x,
+        y: newPosition.y
+      });
+    }
+  );
+
+  // Initialize table data when element changes
+  useEffect(() => {
+    if (element.type === 'table') {
+      const data = Array.isArray(element.values) && element.values.length > 0
+        ? element.values
+        : [{ col1: '', col2: '' }];
+      setTableData(data);
+    }
+  }, [element, element.values]);
+
+  // Initialize edit value when editing starts
+  useEffect(() => {
+    if (isEditing) {
+      initializeEditValue();
+    }
+  }, [element, isEditing]);
+
+  const initializeEditValue = () => {
+    switch (element.type) {
+      case 'list':
+        setEditValue(Array.isArray(element.values) ? element.values.join('\n') : '');
+        break;
+      case 'table':
+        // Table uses its own state system
+        break;
+      case 'image':
+      case 'url':
+        setEditValue(element.props.src || (element.values[0] || ''));
+        break;
+      case 'text':
+      case 'codeblock':
+      default:
+        setEditValue(element.values[0] || '');
+        break;
+    }
+  };
+
+  // Get element style
+  const getElementStyle = (): React.CSSProperties => {
+    const style: React.CSSProperties = {
+      position: 'absolute',
+      left: `${position.x}%`,
+      top: `${position.y}%`,
+      width: `${size.width}%`,
+      height: `${size.height}%`,
+      transform: 'translate(-50%, -50%)',
+      backgroundColor: element.props.background || 'transparent',
+      color: element.props.color || '#000000',
+      opacity: element.props.opacity ? element.props.opacity / 100 : 1,
+      zIndex: element.props.layer || 0,
+      overflow: 'hidden'
+    };
+
+    if (element.props.borders) {
+      style.border = `${element.props.borders.width}px solid ${element.props.borders.color}`;
+    }
+
+    if (element.props.innerMargin) {
+      style.padding = `${element.props.innerMargin}%`;
+    }
+
+    if (element.props.outerMargin) {
+      style.margin = `${element.props.outerMargin}%`;
+    }
+
+    if (element.props.cornerRadius) {
+      style.borderRadius = `${element.props.cornerRadius}%`;
+    }
+
+    if (element.props.horizontalAlignment) {
+      style.textAlign = element.props.horizontalAlignment;
+    }
+
+    if (element.props.verticalAlignment) {
+      switch (element.props.verticalAlignment) {
+        case 'top':
+          style.alignItems = 'flex-start';
+          break;
+        case 'center':
+          style.alignItems = 'center';
+          break;
+        case 'bottom':
+          style.alignItems = 'flex-end';
+          break;
+      }
+      style.display = 'flex';
+    }
+
+    if (element.props.font) {
+      style.fontFamily = element.props.font;
+    }
+
+    if (element.props.fontSize) {
+      style.fontSize = `${element.props.fontSize}px`;
+    }
+
+    if (element.props.shadow) {
+      try {
+        const parts = element.props.shadow.split(';');
+        const size = parts[0] || '5';
+        const color = parts[1] || '#000000';
+        const intensity = parts[2] || '0.5';
+        style.boxShadow = `0 0 ${size}px ${intensity}px ${color}`;
+      } catch (e) {
+        style.boxShadow = `0 0 5px 0.5px #000000`;
+      }
+    }
+
+    if (element.props.glow) {
+      try {
+        const parts = element.props.glow.split(';');
+        const size = parts[0] || '5';
+        const color = parts[1] || '#FFFFFF';
+        const intensity = parts[2] || '0.5';
+        style.textShadow = `0 0 ${size}px ${color}`;
+        style.filter = `brightness(${1 + parseFloat(intensity)})`;
+      } catch (e) {
+        style.textShadow = `0 0 5px #FFFFFF`;
+      }
+    }
+
+    return style;
+  };
+
+  // Handle element drag
+  const handleDragStart = (e: React.MouseEvent) => {
+    if (isResizing || isEditing) return;
+
+    // Prevent if clicking on a resize handle
+    if ((e.target as HTMLElement).className.includes('resize-handle')) {
+      return;
+    }
+
+    // Prevent dragging when interacting with table inputs
+    if (element.type === 'table' && 
+        (e.target instanceof HTMLInputElement || 
+         e.target instanceof HTMLButtonElement ||
+         (e.target as HTMLElement).tagName.toLowerCase() === 'td' || 
+         (e.target as HTMLElement).tagName.toLowerCase() === 'th')) {
+      return;
+    }
+
+    e.stopPropagation();
+    setIsDragging(true);
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startPosX = element.props.x || 50;
+    const startPosY = element.props.y || 50;
+
+    const handleDragMove = (moveEvent: MouseEvent) => {
+      moveEvent.preventDefault();
+
+      const deltaX = moveEvent.clientX - startX;
+      const deltaY = moveEvent.clientY - startY;
+
+      const canvas = document.querySelector('.canvas');
+      if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const xPercent = (deltaX / rect.width) * 100;
+        const yPercent = (deltaY / rect.height) * 100;
+
+        updateElementProps(element.id, {
+          x: startPosX + xPercent,
+          y: startPosY + yPercent
+        });
+      }
+    };
+
+    const handleDragEnd = () => {
+      setIsDragging(false);
+      document.removeEventListener('mousemove', handleDragMove);
+      document.removeEventListener('mouseup', handleDragEnd);
+    };
+
+    document.addEventListener('mousemove', handleDragMove);
+    document.addEventListener('mouseup', handleDragEnd);
+  };
+
+  // Handle double click to edit
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    // Prevent editing when clicking on table inputs
+    if (element.type === 'table' && 
+        (e.target instanceof HTMLInputElement || 
+         e.target instanceof HTMLButtonElement ||
+         (e.target as HTMLElement).tagName.toLowerCase() === 'td' || 
+         (e.target as HTMLElement).tagName.toLowerCase() === 'th')) {
+      return;
+    }
+
+    e.stopPropagation();
+    setIsEditing(true);
+    initializeEditValue();
+  };
+
+  // Save table data to element
+  const saveTableData = () => {
+    if (tableData.length > 0) {
+      updateElementValues(element.id, [...tableData]);
+    }
+  };
+
+  // Add a column to table
+  const addTableColumn = () => {
+    const newColName = `col${Object.keys(tableData[0] || {}).length + 1}`;
+    const newData = tableData.map(row => ({
+      ...row,
+      [newColName]: ''
+    }));
+    
+    setTableData(newData);
+    setTimeout(() => {
+      updateElementValues(element.id, newData);
+    }, 0);
+  };
+
+  // Add a row to table
+  const addTableRow = () => {
+    let newData;
+    
+    if (tableData.length === 0) {
+      newData = [{ col1: '', col2: '' }];
+    } else {
+      const newRow = {};
+      Object.keys(tableData[0]).forEach(key => {
+        newRow[key] = '';
+      });
+      newData = [...tableData, newRow];
+    }
+    
+    setTableData(newData);
+    setTimeout(() => {
+      updateElementValues(element.id, newData);
+    }, 0);
+  };
+
+  // Update table cell
+  const updateTableCell = (rowIndex: number, columnKey: string, value: string) => {
+    const newData = [...tableData];
+    if (newData[rowIndex]) {
+      newData[rowIndex] = { ...newData[rowIndex], [columnKey]: value };
+      setTableData(newData);
+      
+      // Update after state change using setTimeout
+      setTimeout(() => {
+        updateElementValues(element.id, newData);
+      }, 0);
+    }
+  };
+
+  // Rename table column
+  const renameTableColumn = (oldKey: string, newKey: string) => {
+    if (!newKey.trim()) newKey = oldKey;
+    
+    const newData = tableData.map(row => {
+      const newRow = {};
+      Object.entries(row).forEach(([k, v]) => {
+        if (k === oldKey) {
+          newRow[newKey] = v;
+        } else {
+          newRow[k] = v;
+        }
+      });
+      return newRow;
+    });
+    
+    setTableData(newData);
+    
+    // Update after state change using setTimeout
+    setTimeout(() => {
+      updateElementValues(element.id, newData);
+    }, 0);
+  };
+
+  // Handle saving edited values
+  const handleEditSave = () => {
+    try {
+      switch (element.type) {
+        case 'list':
+          const listItems = editValue.split('\n').filter(item => item.trim() !== '');
+          updateElementValues(element.id, listItems);
+          break;
+        case 'table':
+          // Table has its own save mechanism
+          break;
+        case 'image':
+        case 'url':
+          updateElementProps(element.id, { src: editValue });
+          updateElementValues(element.id, [editValue]);
+          break;
+        case 'text':
+        case 'codeblock':
+        default:
+          updateElementValues(element.id, [editValue]);
+          break;
+      }
+    } catch (e) {
+      console.error("Error saving element:", e);
+    }
+
+    setIsEditing(false);
+  };
+
+  // Render content in edit mode
+  const renderEditContent = () => {
+    switch (element.type) {
+      case 'text':
+      case 'codeblock':
+        return (
+          <textarea
+            className="element-editor"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={handleEditSave}
+            autoFocus
+            style={{
+              width: '100%',
+              height: '100%',
+              resize: 'none',
+              background: element.type === 'codeblock' ? '#f5f5f5' : 'transparent',
+              fontFamily: element.type === 'codeblock' ? 'monospace' : 'inherit'
+            }}
+          />
+        );
+
+      case 'list':
+        return (
+          <textarea
+            className="element-editor"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={handleEditSave}
+            autoFocus
+            placeholder="One item per line"
+            style={{ width: '100%', height: '100%', resize: 'none' }}
+          />
+        );
+
+      case 'image':
+      case 'url':
+        return (
+          <input
+            type="text"
+            className="element-editor"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={handleEditSave}
+            autoFocus
+            placeholder={element.type === 'image' ? "Image URL" : "URL"}
+            style={{ width: '100%' }}
+          />
+        );
+
+      default:
+        return (
+          <div className="element-content">Unknown element type</div>
+        );
+    }
+  };
+
+  // Render content in view mode
+  const renderViewContent = () => {
+    switch (element.type) {
+      case 'text':
+        return (
+          <div className="element-content text-element">
+            {element.values[0] || ''}
+          </div>
+        );
+
+      case 'image':
+        return (
+          <div className="element-content image-element">
+            {element.props.src ? (
+              <img
+                src={element.props.src}
+                alt={`Image ${element.id}`}
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+              />
+            ) : (
+              <div className="empty-placeholder">Double-click to add image URL</div>
+            )}
+          </div>
+        );
+
+      case 'shape':
+        return (
+          <div className="element-content shape-element">
+            <svg
+              viewBox="0 0 100 100"
+              style={{ width: '100%', height: '100%' }}
+              dangerouslySetInnerHTML={{ __html: element.values[0] || '' }}
+            />
+          </div>
+        );
+
+      case 'list':
+        return (
+          <div className="element-content list-element">
+            {Array.isArray(element.values) && element.values.length > 0 ? (
+              <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                {element.values.map((item, index) => (
+                  <li key={index}>{item}</li>
+                ))}
+              </ul>
+            ) : (
+              <div className="empty-placeholder">Double-click to add list items</div>
+            )}
+          </div>
+        );
+
+      case 'table':
+        return (
+          <div 
+            ref={tableEditRef}
+            className="element-content table-element"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {tableData.length > 0 ? (
+              <div className="table-container">
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      {Object.keys(tableData[0] || {}).map((key, index) => (
+                        <th key={`header-${index}`} style={{ border: '1px solid #ccc', padding: '0' }}>
+                          <input
+                            type="text"
+                            defaultValue={key}
+                            onBlur={(e) => {
+                              if (e.target.value !== key) {
+                                renameTableColumn(key, e.target.value);
+                              }
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              (e.target as HTMLInputElement).select();
+                            }}
+                            style={{ 
+                              width: '100%', 
+                              textAlign: 'center', 
+                              fontWeight: 'bold',
+                              border: 'none',
+                              padding: '4px',
+                              background: 'transparent'
+                            }}
+                          />
+                        </th>
+                      ))}
+                      <th style={{ width: '30px', padding: '0' }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addTableColumn();
+                          }}
+                          style={{ width: '100%', padding: '2px' }}
+                        >+</button>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tableData.map((row, rowIndex) => (
+                      <tr key={`row-${rowIndex}`}>
+                        {Object.entries(row).map(([key, value], colIndex) => (
+                          <td key={`cell-${rowIndex}-${colIndex}`} style={{ border: '1px solid #ccc', padding: '0' }}>
+                            <input
+                              type="text"
+                              defaultValue={value as string}
+                              onBlur={(e) => {
+                                if (e.target.value !== value) {
+                                  updateTableCell(rowIndex, key, e.target.value);
+                                }
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                (e.target as HTMLInputElement).select();
+                              }}
+                              style={{ 
+                                width: '100%', 
+                                border: 'none',
+                                padding: '4px',
+                                background: 'transparent'
+                              }}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div style={{ marginTop: '5px' }}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      addTableRow();
+                    }}
+                    style={{ width: '100%', padding: '2px' }}
+                  >
+                    + Add Row
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="empty-placeholder">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    addTableRow();
+                  }}
+                >
+                  Create Table
+                </button>
+              </div>
+            )}
+          </div>
+        );
+
+      case 'pagebreak':
+        return (
+          <div className="element-content pagebreak-element">
+            <hr style={{ border: 'none', borderTop: '1px dashed #888', width: '100%' }} />
+            <div style={{ textAlign: 'center', color: '#888' }}>Page Break</div>
+          </div>
+        );
+
+      case 'pagenumber':
+        return (
+          <div className="element-content pagenumber-element">
+            <div style={{ textAlign: 'center' }}>
+              {element.values[0] || '1'}
+            </div>
+          </div>
+        );
+
+      case 'pagetotal':
+        return (
+          <div className="element-content pagetotal-element">
+            <div style={{ textAlign: 'center' }}>
+              {element.values[0] || '1'}
+            </div>
+          </div>
+        );
+
+      case 'datetime':
+        return (
+          <div className="element-content datetime-element">
+            {element.values[0] || new Date().toLocaleDateString()}
+          </div>
+        );
+
+      case 'url':
+        if (!element.props.src && (!element.values || !element.values[0])) {
+          return <div className="empty-placeholder">Double-click to add URL</div>;
+        }
+
+        const url = element.props.src || element.values[0] || '#';
+        const displayText = element.values[0] || element.props.src || url;
+
+        return (
+          <div className="element-content url-element">
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: 'underline', color: 'blue' }}
+            >
+              {displayText}
+            </a>
+          </div>
+        );
+
+      case 'codeblock':
+        return (
+          <div className="element-content codeblock-element">
+            <pre style={{ margin: 0, padding: '8px', backgroundColor: '#f5f5f5', overflow: 'auto', height: '100%' }}>
+              <code>{element.values[0] || ''}</code>
+            </pre>
+          </div>
+        );
+
+      default:
+        return <div className="element-content">Unknown element type</div>;
+    }
+  };
+
+  return (
+    <div
+      ref={elementRef}
+      className={`template-element element-${element.type} ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''}`}
+      style={getElementStyle()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      onMouseDown={handleDragStart}
+      onDoubleClick={handleDoubleClick}
+    >
+      {element.type === 'table' ? renderViewContent() : (isEditing ? renderEditContent() : renderViewContent())}
+
+      {isSelected && (
+        <>
+          <div className="resize-handle top" onMouseDown={(e) => { e.stopPropagation(); startResize('top', e); }}></div>
+          <div className="resize-handle right" onMouseDown={(e) => { e.stopPropagation(); startResize('right', e); }}></div>
+          <div className="resize-handle bottom" onMouseDown={(e) => { e.stopPropagation(); startResize('bottom', e); }}></div>
+          <div className="resize-handle left" onMouseDown={(e) => { e.stopPropagation(); startResize('left', e); }}></div>
+          <div className="resize-handle top-left" onMouseDown={(e) => { e.stopPropagation(); startResize('topLeft', e); }}></div>
+          <div className="resize-handle top-right" onMouseDown={(e) => { e.stopPropagation(); startResize('topRight', e); }}></div>
+          <div className="resize-handle bottom-left" onMouseDown={(e) => { e.stopPropagation(); startResize('bottomLeft', e); }}></div>
+          <div className="resize-handle bottom-right" onMouseDown={(e) => { e.stopPropagation(); startResize('bottomRight', e); }}></div>
+        </>
+      )}
+    </div>
+  );
+};
+
+export default CanvasElement;

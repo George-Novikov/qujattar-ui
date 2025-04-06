@@ -1,0 +1,80 @@
+/* Palette */
+.palette {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 700px;
+    max-width: 90vw;
+    background-color: var(--bg-primary);
+    border-top-left-radius: var(--border-radius);
+    border-top-right-radius: var(--border-radius);
+    box-shadow: 0 -2px 10px var(--shadow-color);
+    z-index: 900;
+    transition: transform 0.3s ease;
+  }
+  
+  /* Palette Header */
+  .palette-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-sm);
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+  }
+  
+  /* Palette Elements */
+  .palette-elements {
+    display: flex;
+    flex-wrap: wrap;
+    padding: var(--spacing-md);
+    gap: var(--spacing-md);
+  }
+  
+  /* Palette Element */
+  .palette-element {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    padding: var(--spacing-sm);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    cursor: grab;
+    transition: all 0.2s ease;
+  }
+  
+  .palette-element:hover {
+    border-color: var(--color-scheme);
+    transform: scale(1.05);
+    box-shadow: 0 2px 5px var(--shadow-color);
+  }
+  
+  .palette-element:active {
+    cursor: grabbing;
+  }
+  
+  /* Palette Element Icon */
+  .palette-element-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    margin-bottom: var(--spacing-xs);
+  }
+  
+  .palette-element-icon svg {
+    width: 100%;
+    height: 100%;
+  }
+  
+  /* Palette Element Label */
+  .palette-element-label {
+    font-size: 12px;
+    text-align: center;
+    color: var(--text-primary);
+  }

@@ -1,0 +1,338 @@
+/* Canvas Container */
+.canvas-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  padding: 40px;
+  background-color: var(--bg-secondary);
+}
+
+/* Canvas */
+.canvas {
+  position: relative;
+  box-shadow: 0 4px 16px var(--shadow-color);
+  background-color: white;
+  z-index: 1;
+  transition: all 0.3s ease;
+}
+
+/* Canvas Grid */
+.canvas-grid {
+  background-image: linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Canvas Rulers */
+.canvas-ruler-horizontal {
+  position: absolute;
+  top: -20px;
+  left: 0;
+  right: 0;
+  height: 20px;
+  background-color: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.canvas-ruler-vertical {
+  position: absolute;
+  top: 0;
+  left: -20px;
+  bottom: 0;
+  width: 20px;
+  background-color: var(--bg-primary);
+  border-right: 1px solid var(--border-color);
+}
+
+/* Elements Container */
+.elements-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Template Elements */
+.template-element {
+  position: absolute;
+  cursor: move;
+  box-sizing: border-box;
+}
+
+.template-element.selected {
+  outline: 2px solid var(--color-scheme);
+  z-index: 100;
+}
+
+/* Element Content */
+.element-content {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.text-element {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.codeblock-element {
+  background-color: #f5f5f5;
+  padding: 10px;
+  font-family: monospace;
+  font-size: 12px;
+  overflow: auto;
+}
+
+.codeblock-element code {
+  white-space: pre;
+}
+
+.list-element ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.table-element table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table-element th,
+.table-element td {
+  border: 1px solid var(--border-color);
+  padding: 4px;
+}
+
+.pagebreak-element hr {
+  border: none;
+  border-top: 1px dashed #888;
+  width: 100%;
+}
+
+/* Resize Handles */
+.resize-handle {
+  position: absolute;
+  background-color: var(--color-scheme);
+  border: 1px solid white;
+  z-index: 101;
+}
+
+.resize-handle.top,
+.resize-handle.bottom {
+  left: 50%;
+  transform: translateX(-50%);
+  width: 10px;
+  height: 10px;
+  cursor: ns-resize;
+}
+
+.resize-handle.left,
+.resize-handle.right {
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 10px;
+  cursor: ew-resize;
+}
+
+.resize-handle.top {
+  top: -5px;
+}
+
+.resize-handle.right {
+  right: -5px;
+}
+
+.resize-handle.bottom {
+  bottom: -5px;
+}
+
+.resize-handle.left {
+  left: -5px;
+}
+
+.resize-handle.top-left,
+.resize-handle.top-right,
+.resize-handle.bottom-left,
+.resize-handle.bottom-right {
+  width: 10px;
+  height: 10px;
+}
+
+.resize-handle.top-left {
+  top: -5px;
+  left: -5px;
+  cursor: nwse-resize;
+}
+
+.resize-handle.top-right {
+  top: -5px;
+  right: -5px;
+  cursor: nesw-resize;
+}
+
+.resize-handle.bottom-left {
+  bottom: -5px;
+  left: -5px;
+  cursor: nesw-resize;
+}
+
+.resize-handle.bottom-right {
+  bottom: -5px;
+  right: -5px;
+  cursor: nwse-resize;
+}
+
+/* Template Columns and Rows */
+.template-column,
+.template-row {
+  position: absolute;
+}
+
+.template-column.selected,
+.template-row.selected {
+  z-index: 99;
+}
+
+.template-element.dragging {
+  cursor: grabbing;
+  opacity: 0.8;
+}
+
+.element-editor {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  padding: 5px;
+  resize: none;
+}
+
+.code-editor {
+  font-family: monospace;
+  white-space: pre;
+  background-color: #f5f5f5;
+}
+
+.empty-placeholder {
+  color: #888;
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  padding: 5px;
+  font-size: 12px;
+}
+
+.element-editor {
+  width: 100%;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  padding: 5px;
+  box-sizing: border-box;
+}
+
+
+
+.empty-placeholder {
+  color: #888;
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  padding: 5px;
+  font-size: 12px;
+}
+
+.element-editor {
+  width: 100%;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  padding: 5px;
+  box-sizing: border-box;
+}
+
+.table-container {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+
+.table-element table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table-element th,
+.table-element td {
+  border: 1px solid #ccc;
+  padding: 0;
+  position: relative;
+}
+
+.table-element input {
+  width: 100%;
+  border: none;
+  padding: 4px;
+  background: transparent;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.table-element th input {
+  font-weight: bold;
+  text-align: center;
+}
+
+.table-element button {
+  background: #eee;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 2px;
+  font-size: 12px;
+}
+
+.table-element button:hover {
+  background: #ddd;
+}
+
+/* Additional styles for dragging */
+.template-element.dragging {
+  opacity: 0.8;
+  cursor: grabbing;
+  z-index: 1000 !important;
+}
+
+/* Make sure inputs in elements don't interfere with dragging */
+.template-element input,
+.template-element textarea,
+.template-element button {
+  pointer-events: auto;
+}
+
+/* Additional styles for resize handles */
+.template-element .resize-handle {
+  background-color: var(--color-scheme, #4C9AFF);
+}

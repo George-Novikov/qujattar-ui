@@ -1,0 +1,140 @@
+/* Tree Container */
+.tree {
+    width: 250px;
+    background-color: var(--bg-primary);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 800;
+  }
+  
+  /* Tree Header */
+  .tree-header {
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
+    font-weight: bold;
+  }
+  
+  /* Tree Content */
+  .tree-content {
+    padding: var(--spacing-sm);
+    overflow-y: auto;
+    flex-grow: 1;
+  }
+  
+  /* Tree Item Container */
+  .tree-item-container {
+    margin-bottom: 2px;
+  }
+  
+  /* Tree Item */
+  .tree-item {
+    display: flex;
+    align-items: center;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+  
+  .tree-item:hover {
+    background-color: var(--bg-secondary);
+  }
+  
+  .tree-item.selected {
+    background-color: var(--color-scheme-transparent);
+    color: var(--color-scheme);
+  }
+  
+  /* Tree Item Toggle */
+  .tree-item-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin-right: var(--spacing-xs);
+    font-size: 8px;
+    cursor: pointer;
+  }
+  
+  /* Tree Item Icon */
+  .tree-item-icon {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-right: var(--spacing-xs);
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+  }
+  
+  .tree-item-icon.template::before {
+    content: "📄";
+  }
+  
+  .tree-item-icon.column::before {
+    content: "▯";
+  }
+  
+  .tree-item-icon.row::before {
+    content: "▭";
+  }
+  
+  .tree-item-icon.text::before {
+    content: "T";
+  }
+  
+  .tree-item-icon.image::before {
+    content: "🖼️";
+  }
+  
+  .tree-item-icon.shape::before {
+    content: "◯";
+  }
+  
+  .tree-item-icon.list::before {
+    content: "•";
+  }
+  
+  .tree-item-icon.table::before {
+    content: "⊞";
+  }
+  
+  .tree-item-icon.pagebreak::before {
+    content: "⤵";
+  }
+  
+  .tree-item-icon.pagenumber::before {
+    content: "1";
+  }
+  
+  .tree-item-icon.pagetotal::before {
+    content: "∑";
+  }
+  
+  .tree-item-icon.datetime::before {
+    content: "🕐";
+  }
+  
+  .tree-item-icon.url::before {
+    content: "🔗";
+  }
+  
+  .tree-item-icon.codeblock::before {
+    content: "<>";
+  }
+  
+  /* Tree Item Children */
+  .tree-item-children {
+    padding-left: var(--spacing-lg);
+  }
+  
+  /* Tree Item Label */
+  .tree-item-label {
+    flex-grow: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }

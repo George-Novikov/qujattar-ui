@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  # Frontend React application
+  frontend:
+    build:
+      context: .
+      args:
+        # These args are used during build time
+        - VITE_API_URL=/api
+    environment:
+      # These environment variables are used at runtime
+      - VITE_API_URL=/api
+      - VITE_APP_NAME=React TypeScript App
+      - VITE_APP_VERSION=0.1.0
+    ports:
+      - "80:80"
+    restart: unless-stopped
+    # Uncomment to connect to backend when needed
+    # depends_on:
+    #   - backend
+
+  # Uncomment to add a backend service when needed
+  # backend:
+  #   image: your-spring-boot-app:latest
+  #   environment:
+  #
