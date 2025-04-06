@@ -86,6 +86,7 @@ const Tree: React.FC = () => {
                         label={`${element.type.charAt(0).toUpperCase() + element.type.slice(1)} ${element.id.split('-')[1]}`}
                         isSelected={selectedElement && 'id' in selectedElement && selectedElement.id === element.id && !selectedTableElement}
                         isExpanded={isTableElement && tableData && 
+                          // @ts-ignore
                           (selectedElement?.id === element.id || selectedTableElement?.elementId === element.id)}
                         onClick={() => {
                           setSelectedElement(element);

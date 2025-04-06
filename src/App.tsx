@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { TemplateProvider } from './context/TemplateContext';
 import { AppSettingsProvider, useAppSettings } from './context/AppSettingsContext';
 import Header from './components/Header/Header';
@@ -46,11 +47,16 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <AppSettingsProvider>
-      <TemplateProvider>
-        <AppContent />
-      </TemplateProvider>
-    </AppSettingsProvider>
+    <BrowserRouter>
+      <AppSettingsProvider>
+        <TemplateProvider>
+          <Routes>
+            <Route path="/" element={<AppContent />} />
+            <Route path="/qujattar" element={<AppContent />} />
+          </Routes>
+        </TemplateProvider>
+      </AppSettingsProvider>
+    </BrowserRouter>
   );
 };
 
