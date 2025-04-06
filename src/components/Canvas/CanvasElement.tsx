@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { TemplateElement } from '../../models/Template';
 import { useResizable } from '../../hooks/useResizable';
 import { useTemplate } from '../../context/TemplateContext';
-import AdvancedTableElement from './AdvancedTableElement';
 import './Canvas.css';
 
 interface CanvasElementProps {
@@ -20,7 +19,7 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
   isSelected,
   onClick
 }) => {
-  const { updateElementProps, updateElementValues } = useTemplate();
+  const { updateElementProps, updateElementValues, setSelectedTableElement, updateTableRowProps } = useTemplate();
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -180,12 +179,24 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
       return;
     }
 
-    // Prevent dragging when interacting with table inputs
-    if (element.type === 'table' &&
-      (e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLButtonElement ||
-        (e.target as HTMLElement).tagName.toLowerCase() === 'td' ||
-        (e.target as HTMLElement).tagName.toLowerCase() === 'th')) {
+    // Only allow dragging when clicking directly on the element or its container
+    // but not on any inputs, buttons, table cells etc
+    const target = e.target as HTMLElement;
+    const isInputOrControl = 
+      target instanceof HTMLInputElement || 
+      target instanceof HTMLButtonElement ||
+      target instanceof HTMLTableCellElement ||
+      target instanceof HTMLTableRowElement ||
+      target instanceof HTMLTableElement ||
+      target.tagName.toLowerCase() === 'th' ||
+      target.tagName.toLowerCase() === 'td' ||
+      target.tagName.toLowerCase() === 'tr' ||
+      target.tagName.toLowerCase() === 'thead' ||
+      target.tagName.toLowerCase() === 'tbody' ||
+      target.classList.contains('hierarchical-table') ||
+      target.classList.contains('table-actions');
+    
+    if (element.type === 'table' && isInputOrControl) {
       return;
     }
 
@@ -242,85 +253,6 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
     initializeEditValue();
   };
 
-  // Save table data to element
-  const saveTableData = () => {
-    if (tableData.length > 0) {
-      updateElementValues(element.id, [...tableData]);
-    }
-  };
-
-  // Add a column to table
-  const addTableColumn = () => {
-    const newColName = `col${Object.keys(tableData[0] || {}).length + 1}`;
-    const newData = tableData.map(row => ({
-      ...row,
-      [newColName]: ''
-    }));
-
-    setTableData(newData);
-    setTimeout(() => {
-      updateElementValues(element.id, newData);
-    }, 0);
-  };
-
-  // Add a row to table
-  const addTableRow = () => {
-    let newData;
-
-    if (tableData.length === 0) {
-      newData = [{ col1: '', col2: '' }];
-    } else {
-      const newRow = {};
-      Object.keys(tableData[0]).forEach(key => {
-        newRow[key] = '';
-      });
-      newData = [...tableData, newRow];
-    }
-
-    setTableData(newData);
-    setTimeout(() => {
-      updateElementValues(element.id, newData);
-    }, 0);
-  };
-
-  // Update table cell
-  const updateTableCell = (rowIndex: number, columnKey: string, value: string) => {
-    const newData = [...tableData];
-    if (newData[rowIndex]) {
-      newData[rowIndex] = { ...newData[rowIndex], [columnKey]: value };
-      setTableData(newData);
-
-      // Update after state change using setTimeout
-      setTimeout(() => {
-        updateElementValues(element.id, newData);
-      }, 0);
-    }
-  };
-
-  // Rename table column
-  const renameTableColumn = (oldKey: string, newKey: string) => {
-    if (!newKey.trim()) newKey = oldKey;
-
-    const newData = tableData.map(row => {
-      const newRow = {};
-      Object.entries(row).forEach(([k, v]) => {
-        if (k === oldKey) {
-          newRow[newKey] = v;
-        } else {
-          newRow[k] = v;
-        }
-      });
-      return newRow;
-    });
-
-    setTableData(newData);
-
-    // Update after state change using setTimeout
-    setTimeout(() => {
-      updateElementValues(element.id, newData);
-    }, 0);
-  };
-
   // Handle saving edited values
   const handleEditSave = () => {
     try {
@@ -348,6 +280,83 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
     }
 
     setIsEditing(false);
+  };
+
+  // Create default table data structure
+  const createDefaultTableData = (element) => {
+    // Create default table structure
+    return {
+      columns: [
+        { id: 'col_0', name: 'Column 1', order: 0, props: { width: 100 } },
+        { id: 'col_1', name: 'Column 2', order: 1, props: { width: 100 } }
+      ],
+      rows: [
+        {
+          id: 'row_0',
+          order: 0,
+          props: { height: 30 },
+          cells: { 'col_0': '', 'col_1': '' }
+        }
+      ],
+      settings: {
+        borders: true,
+        headerRow: true
+      }
+    };
+  };
+
+  // Adjust table size based on content
+  const adjustTableSize = (tableData) => {
+    // Calculate appropriate size based on column count and row count
+    const columnCount = tableData.columns.length;
+    const rowCount = tableData.rows.length;
+    
+    // Base size for the table
+    const baseWidth = 20; // per column
+    const baseHeight = 5; // per row
+    
+    // Calculate new dimensions (with some minimum values)
+    const newWidth = Math.max(20, baseWidth * columnCount);
+    const newHeight = Math.max(10, baseHeight * rowCount);
+    
+    // Update element properties
+    updateElementProps(element.id, {
+      width: newWidth,
+      height: newHeight
+    });
+  };
+
+  // Handle row resizing
+  const handleRowResize = (row, e: React.MouseEvent) => {
+    // Only handle row height resize when clicking on bottom edge
+    const rect = e.currentTarget.getBoundingClientRect();
+    const bottomEdge = rect.bottom;
+    const clickY = e.clientY;
+    
+    if (Math.abs(clickY - bottomEdge) <= 5) {
+      e.stopPropagation();
+      e.preventDefault();
+      
+      const startY = e.clientY;
+      const startHeight = row.props.height || 30;
+      
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        moveEvent.preventDefault();
+        const deltaY = moveEvent.clientY - startY;
+        const newHeight = Math.max(20, startHeight + deltaY);
+        
+        // Update row height
+        updateTableRowProps(element.id, row.id, { height: newHeight });
+      };
+      
+      const handleMouseUp = () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+      
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
   };
 
   // Render content in edit mode
@@ -407,33 +416,6 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
     }
   };
 
-  const createDefaultTableData = (element) => {
-    // Create default table structure
-    return {
-      columns: [
-        { id: 'col_0', name: 'Column 1', order: 0, props: { width: 100 } },
-        { id: 'col_1', name: 'Column 2', order: 1, props: { width: 100 } }
-      ],
-      rows: [
-        {
-          id: 'row_0',
-          order: 0,
-          props: { height: 30 },
-          cells: { 'col_0': '', 'col_1': '' }
-        }
-      ],
-      settings: {
-        borders: true,
-        headerRow: true
-      }
-    };
-  };
-
-  // And add this to access the context functions:
-  const {
-    setSelectedTableElement
-  } = useTemplate();
-
   // Render content in view mode
   const renderViewContent = () => {
     switch (element.type) {
@@ -487,11 +469,7 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
 
       case 'table':
         return (
-          <div
-            ref={tableEditRef}
-            className="element-content table-element"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="element-content table-element">
             {(() => {
               // Convert the element values to our structured format if needed
               const tableData = Array.isArray(element.values) && element.values[0]?.columns
@@ -506,7 +484,7 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
               const { selectedTableElement } = useTemplate();
 
               return (
-                <div className="hierarchical-table">
+                <div className="hierarchical-table" onClick={(e) => e.stopPropagation()}>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <colgroup>
                       {tableData.columns.map(column => (
@@ -552,13 +530,14 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
                       {tableData.rows.map((row) => (
                         <tr
                           key={row.id}
-                          className={selectedTableElement?.elementId === element.id &&
+                          className={`resizable-row ${selectedTableElement?.elementId === element.id &&
                             selectedTableElement?.type === 'row' &&
                             selectedTableElement?.id === row.id
-                            ? 'selected-row' : ''}
+                            ? 'selected-row' : ''}`}
                           style={{
                             height: `${row.props.height || 30}px`,
-                            backgroundColor: row.props.background || 'transparent'
+                            backgroundColor: row.props.background || 'transparent',
+                            position: 'relative'
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -568,6 +547,7 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
                               id: row.id
                             });
                           }}
+                          onMouseDown={(e) => handleRowResize(row, e)}
                         >
                           {tableData.columns.map((column) => (
                             <td
@@ -640,12 +620,17 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
                           cells: { ...r.cells, [newColumnId]: '' }
                         }));
 
-                        // Update the element values
-                        updateElementValues(element.id, [{
+                        const updatedTableData = {
                           ...tableData,
                           columns: [...tableData.columns, newColumn],
                           rows: updatedRows
-                        }]);
+                        };
+
+                        // Update the element values
+                        updateElementValues(element.id, [updatedTableData]);
+                        
+                        // Adjust table size
+                        adjustTableSize(updatedTableData);
                       }}
                     >
                       Add Column
@@ -670,11 +655,16 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
                           cells
                         };
 
-                        // Update the element values
-                        updateElementValues(element.id, [{
+                        const updatedTableData = {
                           ...tableData,
                           rows: [...tableData.rows, newRow]
-                        }]);
+                        };
+
+                        // Update the element values
+                        updateElementValues(element.id, [updatedTableData]);
+                        
+                        // Adjust table size
+                        adjustTableSize(updatedTableData);
                       }}
                     >
                       Add Row

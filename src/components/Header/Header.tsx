@@ -31,7 +31,7 @@ const Header: React.FC = () => {
     <div className="header">
       {/* Logo */}
       <div className="header-logo">
-        <span className="logo-text">Template Editor</span>
+        <span className="logo-text">ARTA Qujattar</span>
       </div>
       
       {/* Left Menu Items */}
