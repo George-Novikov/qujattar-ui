@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import {
   Template,
   TemplateElement,
@@ -49,16 +49,32 @@ interface TemplateContextProps {
 const TemplateContext = createContext<TemplateContextProps | undefined>(undefined);
 
 export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [template, setTemplate] = useState<Template>(createNewTemplate());
+  const initialTemplate = useRef(createNewTemplate()).current;
+  const [template, setTemplate] = useState<Template>(initialTemplate);
   const [selectedElement, setSelectedElement] = useState<TemplateElement | Row | Column | null>(null);
   const { settings } = useAppSettings();
+  
+  // Initialize history with the initial template
   const {
+    state: historyState,
     addToHistory,
     undo,
     redo,
     canUndo,
-    canRedo
-  } = useTemplateHistory<Template>(template);
+    canRedo,
+    clearHistory
+  } = useTemplateHistory<Template>(initialTemplate);
+  
+  // Flag to prevent adding history entries during undo/redo operations
+  const isUndoRedoOperation = useRef(false);
+
+  // Synchronize template state with history state
+  useEffect(() => {
+    // Only update if not in the middle of an undo/redo operation
+    if (!isUndoRedoOperation.current) {
+      setTemplate(historyState);
+    }
+  }, [historyState]);
 
   // Auto-save feature
   useEffect(() => {
@@ -71,9 +87,14 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   }, [template, settings.autoSave, settings.isAuthenticated]);
 
+  // Helper for creating a deep copy
+  const deepCopy = <T extends object>(obj: T): T => {
+    return JSON.parse(JSON.stringify(obj));
+  };
+
   const updateTemplateProps = (props: Partial<Template['props']>) => {
     const updatedTemplate = {
-      ...template,
+      ...deepCopy(template),
       props: {
         ...template.props,
         ...props
@@ -85,7 +106,8 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const updateElementProps = (elementId: string, props: Partial<ElementProps>) => {
-    const updatedTemplate = { ...template };
+    // Create a deep copy to avoid mutation
+    const updatedTemplate = deepCopy(template);
 
     // Find the element in the template
     for (const column of updatedTemplate.columns) {
@@ -110,7 +132,8 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const addElement = (type: ElementType, rowId: number, columnId: number) => {
-    const updatedTemplate = { ...template };
+    // Create a deep copy to avoid mutation
+    const updatedTemplate = deepCopy(template);
 
     const column = updatedTemplate.columns.find(c => c.order === columnId);
     if (!column) return;
@@ -141,7 +164,8 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const removeElement = (elementId: string) => {
-    const updatedTemplate = { ...template };
+    // Create a deep copy to avoid mutation
+    const updatedTemplate = deepCopy(template);
 
     for (const column of updatedTemplate.columns) {
       for (const row of column.rows) {
@@ -169,7 +193,8 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const moveElement = (elementId: string, newRowId: number, newColumnId: number) => {
-    const updatedTemplate = { ...template };
+    // Create a deep copy to avoid mutation
+    const updatedTemplate = deepCopy(template);
     let elementToMove: TemplateElement | null = null;
 
     // Find and remove the element from its current location
@@ -178,7 +203,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
         const elementIndex = row.elements.findIndex(element => element.id === elementId);
 
         if (elementIndex !== -1) {
-          elementToMove = row.elements[elementIndex];
+          elementToMove = deepCopy(row.elements[elementIndex]);
           row.elements.splice(elementIndex, 1);
 
           // Recalculate order for remaining elements
@@ -208,7 +233,8 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const addRow = (columnId: number) => {
-    const updatedTemplate = { ...template };
+    // Create a deep copy to avoid mutation
+    const updatedTemplate = deepCopy(template);
 
     const column = updatedTemplate.columns.find(c => c.order === columnId);
     if (!column) return;
@@ -232,7 +258,8 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const removeRow = (rowId: number, columnId: number) => {
-    const updatedTemplate = { ...template };
+    // Create a deep copy to avoid mutation
+    const updatedTemplate = deepCopy(template);
 
     const column = updatedTemplate.columns.find(c => c.order === columnId);
     if (!column) return;
@@ -256,7 +283,8 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const addColumn = () => {
-    const updatedTemplate = { ...template };
+    // Create a deep copy to avoid mutation
+    const updatedTemplate = deepCopy(template);
 
     const newColumn: Column = {
       order: updatedTemplate.columns.length,
@@ -284,7 +312,8 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const removeColumn = (columnId: number) => {
-    const updatedTemplate = { ...template };
+    // Create a deep copy to avoid mutation
+    const updatedTemplate = deepCopy(template);
 
     const columnIndex = updatedTemplate.columns.findIndex(c => c.order === columnId);
     if (columnIndex === -1) return;
@@ -313,6 +342,9 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
       const parsed = JSON.parse(json) as Template;
       setTemplate(parsed);
+      
+      // Clear history and start fresh with the imported template
+      clearHistory();
       addToHistory(parsed);
     } catch (e) {
       console.error('Failed to parse template JSON:', e);
@@ -347,6 +379,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
       // Mocked API call
       // const loadedTemplate = await apiService.get(`/api/v1/templates?id=${id}`);
       // setTemplate(loadedTemplate);
+      // clearHistory();
       // addToHistory(loadedTemplate);
 
       // For now, just log that we would load the template
@@ -357,22 +390,72 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
+  // Fixed undo/redo functions
   const undoChange = () => {
-    const prevTemplate = undo();
-    if (prevTemplate) {
-      setTemplate(prevTemplate);
+    if (canUndo) {
+      isUndoRedoOperation.current = true;
+      const prevTemplate = undo();
+      
+      if (prevTemplate) {
+        setTemplate(prevTemplate);
+        // If the currently selected element doesn't exist in the previous state,
+        // clear the selection
+        if (selectedElement) {
+          if ('id' in selectedElement) {
+            // Check if element still exists
+            let elementExists = false;
+            outerLoop: for (const column of prevTemplate.columns) {
+              for (const row of column.rows) {
+                if (row.elements.some(el => el.id === selectedElement.id)) {
+                  elementExists = true;
+                  break outerLoop;
+                }
+              }
+            }
+            if (!elementExists) {
+              setSelectedElement(null);
+            }
+          } else if ('order' in selectedElement && 'elements' in selectedElement) {
+            // Check if row still exists
+            let rowExists = false;
+            for (const column of prevTemplate.columns) {
+              if (column.rows.some(row => row.order === selectedElement.order)) {
+                rowExists = true;
+                break;
+              }
+            }
+            if (!rowExists) {
+              setSelectedElement(null);
+            }
+          } else if ('order' in selectedElement && 'rows' in selectedElement) {
+            // Check if column still exists
+            if (!prevTemplate.columns.some(col => col.order === selectedElement.order)) {
+              setSelectedElement(null);
+            }
+          }
+        }
+      }
+      
+      isUndoRedoOperation.current = false;
     }
   };
 
   const redoChange = () => {
-    const nextTemplate = redo();
-    if (nextTemplate) {
-      setTemplate(nextTemplate);
+    if (canRedo) {
+      isUndoRedoOperation.current = true;
+      const nextTemplate = redo();
+      
+      if (nextTemplate) {
+        setTemplate(nextTemplate);
+      }
+      
+      isUndoRedoOperation.current = false;
     }
   };
 
   const updateElementValues = (elementId: string, values: any[]) => {
-    const updatedTemplate = { ...template };
+    // Create a deep copy to avoid mutation
+    const updatedTemplate = deepCopy(template);
 
     // Find the element in the template
     for (const column of updatedTemplate.columns) {
@@ -383,7 +466,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
           // Update the element's values
           row.elements[elementIndex] = {
             ...row.elements[elementIndex],
-            values: values
+            values: deepCopy(values)
           };
 
           setTemplate(updatedTemplate);
@@ -402,7 +485,8 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   // Table column properties update
   const updateTableColumnProps = (elementId: string, columnId: string, props: Partial<ElementProps>) => {
-    const updatedTemplate = { ...template };
+    // Create a deep copy to avoid mutation
+    const updatedTemplate = deepCopy(template);
 
     // Find the element
     for (const column of updatedTemplate.columns) {
@@ -439,7 +523,8 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   // Table row properties update
   const updateTableRowProps = (elementId: string, rowId: string, props: Partial<ElementProps>) => {
-    const updatedTemplate = { ...template };
+    // Create a deep copy to avoid mutation
+    const updatedTemplate = deepCopy(template);
 
     // Find the element
     for (const column of updatedTemplate.columns) {
@@ -476,7 +561,8 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   // Delete table column
   const deleteTableColumn = (elementId: string, columnId: string) => {
-    const updatedTemplate = { ...template };
+    // Create a deep copy to avoid mutation
+    const updatedTemplate = deepCopy(template);
 
     // Find the element
     for (const column of updatedTemplate.columns) {
@@ -529,7 +615,8 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   // Delete table row
   const deleteTableRow = (elementId: string, rowId: string) => {
-    const updatedTemplate = { ...template };
+    // Create a deep copy to avoid mutation
+    const updatedTemplate = deepCopy(template);
 
     // Find the element
     for (const column of updatedTemplate.columns) {

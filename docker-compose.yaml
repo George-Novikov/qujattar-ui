@@ -1,9 +1,8 @@
 version: '3.8'
 services:
   qujattar-ui:
-    container_name: qujattar-ui
     build: 
       context: .
       dockerfile: Dockerfile
     ports:
-      - "80:80"
+      - "7100:80"
