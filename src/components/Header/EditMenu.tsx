@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useTemplate } from '../../context/TemplateContext';
 import './Header.css';
@@ -13,7 +14,11 @@ const EditMenu: React.FC<EditMenuProps> = ({ onClose }) => {
     canUndo, 
     canRedo, 
     selectedElement, 
-    removeElement 
+    removeElement,
+    cutElement,
+    copyElement,
+    pasteElement,
+    canPaste
   } = useTemplate();
   
   const handleUndo = () => {
@@ -28,25 +33,22 @@ const EditMenu: React.FC<EditMenuProps> = ({ onClose }) => {
   
   const handleCut = () => {
     if (selectedElement && 'id' in selectedElement) {
-      // In a full implementation, we would store the element in clipboard
-      // Then remove it
-      // For now, we'll just do the remove part
-      removeElement(selectedElement.id);
+      cutElement();
     }
     onClose();
   };
   
   const handleCopy = () => {
     if (selectedElement && 'id' in selectedElement) {
-      // In a full implementation, we would store the element in clipboard
-      console.log('Copy not implemented yet');
+      copyElement();
     }
     onClose();
   };
   
   const handlePaste = () => {
-    // In a full implementation, we would create a new element from clipboard
-    console.log('Paste not implemented yet');
+    if (canPaste) {
+      pasteElement();
+    }
     onClose();
   };
   
@@ -78,24 +80,24 @@ const EditMenu: React.FC<EditMenuProps> = ({ onClose }) => {
       <div className="dropdown-menu-divider"></div>
       
       <div 
-        className={`dropdown-menu-item ${!selectedElement ? 'dropdown-menu-item-disabled' : ''}`} 
-        onClick={selectedElement ? handleCut : undefined}
+        className={`dropdown-menu-item ${!selectedElement || !('id' in selectedElement) ? 'dropdown-menu-item-disabled' : ''}`} 
+        onClick={selectedElement && 'id' in selectedElement ? handleCut : undefined}
       >
         <span>Cut</span>
         <span className="dropdown-menu-shortcut">Ctrl+X</span>
       </div>
       
       <div 
-        className={`dropdown-menu-item ${!selectedElement ? 'dropdown-menu-item-disabled' : ''}`} 
-        onClick={selectedElement ? handleCopy : undefined}
+        className={`dropdown-menu-item ${!selectedElement || !('id' in selectedElement) ? 'dropdown-menu-item-disabled' : ''}`} 
+        onClick={selectedElement && 'id' in selectedElement ? handleCopy : undefined}
       >
         <span>Copy</span>
         <span className="dropdown-menu-shortcut">Ctrl+C</span>
       </div>
       
       <div 
-        className="dropdown-menu-item dropdown-menu-item-disabled" 
-        onClick={handlePaste}
+        className={`dropdown-menu-item ${!canPaste ? 'dropdown-menu-item-disabled' : ''}`} 
+        onClick={canPaste ? handlePaste : undefined}
       >
         <span>Paste</span>
         <span className="dropdown-menu-shortcut">Ctrl+V</span>
@@ -104,8 +106,8 @@ const EditMenu: React.FC<EditMenuProps> = ({ onClose }) => {
       <div className="dropdown-menu-divider"></div>
       
       <div 
-        className={`dropdown-menu-item ${!selectedElement ? 'dropdown-menu-item-disabled' : ''}`} 
-        onClick={selectedElement ? handleDelete : undefined}
+        className={`dropdown-menu-item ${!selectedElement || !('id' in selectedElement) ? 'dropdown-menu-item-disabled' : ''}`} 
+        onClick={selectedElement && 'id' in selectedElement ? handleDelete : undefined}
       >
         <span>Delete</span>
         <span className="dropdown-menu-shortcut">Delete</span>

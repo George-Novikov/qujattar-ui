@@ -44,6 +44,10 @@ interface TemplateContextProps {
   updateTableRowProps: (elementId: string, rowId: string, props: Partial<ElementProps>) => void;
   deleteTableColumn: (elementId: string, columnId: string) => void;
   deleteTableRow: (elementId: string, rowId: string) => void;
+  cutElement: () => void;
+  copyElement: () => void;
+  pasteElement: () => void;
+  canPaste: boolean;
 }
 
 const TemplateContext = createContext<TemplateContextProps | undefined>(undefined);
@@ -53,6 +57,11 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [template, setTemplate] = useState<Template>(initialTemplate);
   const [selectedElement, setSelectedElement] = useState<TemplateElement | Row | Column | null>(null);
   const { settings } = useAppSettings();
+  
+  // Clipboard state
+  const [clipboardElement, setClipboardElement] = useState<TemplateElement | null>(null);
+  const [clipboardRowId, setClipboardRowId] = useState<number | null>(null);
+  const [clipboardColumnId, setClipboardColumnId] = useState<number | null>(null);
   
   // Initialize history with the initial template
   const {
@@ -657,6 +666,178 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
+  // Cut selected element to clipboard
+  const cutElement = () => {
+    if (!selectedElement || !('id' in selectedElement)) {
+      return; // Only template elements can be cut (not rows or columns)
+    }
+
+    // Find the element's row and column
+    let foundRowId = -1;
+    let foundColumnId = -1;
+    let foundElement: TemplateElement | null = null;
+
+    // Create a deep copy to avoid mutation
+    const updatedTemplate = deepCopy(template);
+
+    // Find the element's location
+    outerLoop: for (const column of updatedTemplate.columns) {
+      for (const row of column.rows) {
+        const elementIndex = row.elements.findIndex(element => 
+          'id' in selectedElement && element.id === selectedElement.id);
+
+        if (elementIndex !== -1) {
+          foundElement = deepCopy(row.elements[elementIndex]);
+          foundRowId = row.order;
+          foundColumnId = column.order;
+          
+          // Remove the element
+          row.elements.splice(elementIndex, 1);
+          
+          // Recalculate order for remaining elements
+          row.elements.forEach((element, idx) => {
+            element.order = idx;
+          });
+          
+          break outerLoop;
+        }
+      }
+    }
+
+    if (foundElement) {
+      // Save to clipboard
+      setClipboardElement(foundElement);
+      setClipboardRowId(foundRowId);
+      setClipboardColumnId(foundColumnId);
+      
+      // Update the template
+      setTemplate(updatedTemplate);
+      addToHistory(updatedTemplate);
+      setSelectedElement(null);
+    }
+  };
+
+  // Copy selected element to clipboard
+  const copyElement = () => {
+    if (!selectedElement || !('id' in selectedElement)) {
+      return; // Only template elements can be copied (not rows or columns)
+    }
+
+    // Find the element's row and column
+    let foundRowId = -1;
+    let foundColumnId = -1;
+    let foundElement: TemplateElement | null = null;
+
+    // Find the element's location
+    outerLoop: for (const column of template.columns) {
+      for (const row of column.rows) {
+        const element = row.elements.find(element => 
+          'id' in selectedElement && element.id === selectedElement.id);
+
+        if (element) {
+          foundElement = deepCopy(element);
+          foundRowId = row.order;
+          foundColumnId = column.order;
+          break outerLoop;
+        }
+      }
+    }
+
+    if (foundElement) {
+      // Save to clipboard without removing from template
+      setClipboardElement(foundElement);
+      setClipboardRowId(foundRowId);
+      setClipboardColumnId(foundColumnId);
+    }
+  };
+
+  // Paste element from clipboard
+  const pasteElement = () => {
+    if (!clipboardElement) {
+      return;
+    }
+
+    // Create a deep copy to avoid mutation
+    const updatedTemplate = deepCopy(template);
+    
+    // Default to the first row and column if nothing is selected
+    let targetRowId = 0;
+    let targetColumnId = 0;
+    
+    // If an element is selected, paste into that element's row and column
+    if (selectedElement) {
+      if ('id' in selectedElement) {
+        // Find selected element's row and column
+        outerLoop: for (const column of updatedTemplate.columns) {
+          for (const row of column.rows) {
+            if (row.elements.some(el => el.id === selectedElement.id)) {
+              targetRowId = row.order;
+              targetColumnId = column.order;
+              break outerLoop;
+            }
+          }
+        }
+      } else if ('elements' in selectedElement) {
+        // Selected element is a row
+        outerLoop: for (const column of updatedTemplate.columns) {
+          if (column.rows.some(row => row.order === selectedElement.order)) {
+            targetRowId = selectedElement.order;
+            targetColumnId = column.order;
+            break;
+          }
+        }
+      } else if ('rows' in selectedElement) {
+        // Selected element is a column
+        targetColumnId = selectedElement.order;
+        if (selectedElement.rows.length > 0) {
+          targetRowId = selectedElement.rows[0].order;
+        }
+      }
+    }
+    
+    // Find the target row
+    let targetColumn = updatedTemplate.columns.find(c => c.order === targetColumnId);
+    if (!targetColumn && updatedTemplate.columns.length > 0) {
+      targetColumn = updatedTemplate.columns[0];
+      targetColumnId = targetColumn.order;
+    }
+    
+    if (!targetColumn) {
+      return; // No valid column found
+    }
+    
+    let targetRow = targetColumn.rows.find(r => r.order === targetRowId);
+    if (!targetRow && targetColumn.rows.length > 0) {
+      targetRow = targetColumn.rows[0];
+      targetRowId = targetRow.order;
+    }
+    
+    if (!targetRow) {
+      return; // No valid row found
+    }
+    
+    // Create a new element based on the clipboard element
+    const newElement: TemplateElement = {
+      ...deepCopy(clipboardElement),
+      id: generateElementId(clipboardElement.type, targetRow.elements),
+      order: targetRow.elements.length
+    };
+    
+    // Add slight offset if pasting to the same location
+    if (targetRowId === clipboardRowId && targetColumnId === clipboardColumnId) {
+      newElement.props.x = (newElement.props.x || 0) + 5;
+      newElement.props.y = (newElement.props.y || 0) + 5;
+    }
+    
+    // Add the element to the target row
+    targetRow.elements.push(newElement);
+    
+    // Update the template
+    setTemplate(updatedTemplate);
+    addToHistory(updatedTemplate);
+    setSelectedElement(newElement);
+  };
+
   return (
     <TemplateContext.Provider
       value={{
@@ -686,7 +867,11 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
         updateTableColumnProps,
         updateTableRowProps,
         deleteTableColumn,
-        deleteTableRow
+        deleteTableRow,
+        cutElement,
+        copyElement,
+        pasteElement,
+        canPaste: clipboardElement !== null
       }}
     >
       {children}
