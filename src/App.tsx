@@ -7,31 +7,32 @@ import Canvas from './components/Canvas/Canvas';
 import Tree from './components/Tree/Tree';
 import Palette from './components/Palette/Palette';
 import Properties from './components/Properties/Properties';
+import KeyboardShortcuts from './components/KeyboardShortcuts';
 import './App.css';
 
 const AppContent: React.FC = () => {
   const { settings } = useAppSettings();
-  
+
   // Apply theme to body
   useEffect(() => {
     document.body.setAttribute('data-theme', settings.theme);
-    
+
     // Set color scheme CSS variable
     document.documentElement.style.setProperty('--color-scheme', settings.colorScheme);
     document.documentElement.style.setProperty(
-      '--color-scheme-hover', 
+      '--color-scheme-hover',
       settings.colorScheme + 'CC' // Add transparency for hover state
     );
     document.documentElement.style.setProperty(
-      '--color-scheme-active', 
+      '--color-scheme-active',
       settings.colorScheme + '99' // Add more transparency for active state
     );
     document.documentElement.style.setProperty(
-      '--color-scheme-transparent', 
+      '--color-scheme-transparent',
       settings.colorScheme + '22' // Add high transparency for backgrounds
     );
   }, [settings.theme, settings.colorScheme]);
-  
+
   return (
     <div className="app">
       <Header />
@@ -50,6 +51,7 @@ const App: React.FC = () => {
     <BrowserRouter>
       <AppSettingsProvider>
         <TemplateProvider>
+          <KeyboardShortcuts />
           <Routes>
             <Route path="/" element={<AppContent />} />
             <Route path="/qujattar" element={<AppContent />} />

@@ -17,7 +17,8 @@ const KeyboardShortcuts: React.FC = () => {
     pasteElement,
     canPaste,
     selectedElement,
-    removeElement
+    removeElement,
+    duplicateElement
   } = useTemplate();
 
   useEffect(() => {
@@ -72,6 +73,13 @@ const KeyboardShortcuts: React.FC = () => {
         pasteElement();
         return;
       }
+      
+      // Handle Ctrl+D for duplicate
+      if (event.ctrlKey && event.key.toLowerCase() === 'd' && selectedElement && 'id' in selectedElement) {
+        event.preventDefault();
+        duplicateElement();
+        return;
+      }
 
       // Handle Delete key
       if (event.key === 'Delete' && selectedElement && 'id' in selectedElement) {
@@ -98,7 +106,8 @@ const KeyboardShortcuts: React.FC = () => {
     pasteElement, 
     canPaste, 
     selectedElement, 
-    removeElement
+    removeElement,
+    duplicateElement
   ]);
 
   // This component doesn't render anything

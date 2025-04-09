@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useTemplate } from '../../context/TemplateContext';
 import './Header.css';
@@ -18,6 +17,7 @@ const EditMenu: React.FC<EditMenuProps> = ({ onClose }) => {
     cutElement,
     copyElement,
     pasteElement,
+    duplicateElement,
     canPaste
   } = useTemplate();
   
@@ -48,6 +48,13 @@ const EditMenu: React.FC<EditMenuProps> = ({ onClose }) => {
   const handlePaste = () => {
     if (canPaste) {
       pasteElement();
+    }
+    onClose();
+  };
+  
+  const handleDuplicate = () => {
+    if (selectedElement && 'id' in selectedElement) {
+      duplicateElement();
     }
     onClose();
   };
@@ -101,6 +108,14 @@ const EditMenu: React.FC<EditMenuProps> = ({ onClose }) => {
       >
         <span>Paste</span>
         <span className="dropdown-menu-shortcut">Ctrl+V</span>
+      </div>
+      
+      <div 
+        className={`dropdown-menu-item ${!selectedElement || !('id' in selectedElement) ? 'dropdown-menu-item-disabled' : ''}`} 
+        onClick={selectedElement && 'id' in selectedElement ? handleDuplicate : undefined}
+      >
+        <span>Duplicate</span>
+        <span className="dropdown-menu-shortcut">Ctrl+D</span>
       </div>
       
       <div className="dropdown-menu-divider"></div>

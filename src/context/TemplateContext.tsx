@@ -48,6 +48,7 @@ interface TemplateContextProps {
   copyElement: () => void;
   pasteElement: () => void;
   canPaste: boolean;
+  duplicateElement: () => void;
 }
 
 const TemplateContext = createContext<TemplateContextProps | undefined>(undefined);
@@ -57,12 +58,12 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [template, setTemplate] = useState<Template>(initialTemplate);
   const [selectedElement, setSelectedElement] = useState<TemplateElement | Row | Column | null>(null);
   const { settings } = useAppSettings();
-  
+
   // Clipboard state
   const [clipboardElement, setClipboardElement] = useState<TemplateElement | null>(null);
   const [clipboardRowId, setClipboardRowId] = useState<number | null>(null);
   const [clipboardColumnId, setClipboardColumnId] = useState<number | null>(null);
-  
+
   // Initialize history with the initial template
   const {
     state: historyState,
@@ -73,7 +74,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
     canRedo,
     clearHistory
   } = useTemplateHistory<Template>(initialTemplate);
-  
+
   // Flag to prevent adding history entries during undo/redo operations
   const isUndoRedoOperation = useRef(false);
 
@@ -351,7 +352,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
       const parsed = JSON.parse(json) as Template;
       setTemplate(parsed);
-      
+
       // Clear history and start fresh with the imported template
       clearHistory();
       addToHistory(parsed);
@@ -404,7 +405,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
     if (canUndo) {
       isUndoRedoOperation.current = true;
       const prevTemplate = undo();
-      
+
       if (prevTemplate) {
         setTemplate(prevTemplate);
         // If the currently selected element doesn't exist in the previous state,
@@ -444,7 +445,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
           }
         }
       }
-      
+
       isUndoRedoOperation.current = false;
     }
   };
@@ -453,11 +454,11 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
     if (canRedo) {
       isUndoRedoOperation.current = true;
       const nextTemplate = redo();
-      
+
       if (nextTemplate) {
         setTemplate(nextTemplate);
       }
-      
+
       isUndoRedoOperation.current = false;
     }
   };
@@ -683,22 +684,22 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
     // Find the element's location
     outerLoop: for (const column of updatedTemplate.columns) {
       for (const row of column.rows) {
-        const elementIndex = row.elements.findIndex(element => 
+        const elementIndex = row.elements.findIndex(element =>
           'id' in selectedElement && element.id === selectedElement.id);
 
         if (elementIndex !== -1) {
           foundElement = deepCopy(row.elements[elementIndex]);
           foundRowId = row.order;
           foundColumnId = column.order;
-          
+
           // Remove the element
           row.elements.splice(elementIndex, 1);
-          
+
           // Recalculate order for remaining elements
           row.elements.forEach((element, idx) => {
             element.order = idx;
           });
-          
+
           break outerLoop;
         }
       }
@@ -709,7 +710,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
       setClipboardElement(foundElement);
       setClipboardRowId(foundRowId);
       setClipboardColumnId(foundColumnId);
-      
+
       // Update the template
       setTemplate(updatedTemplate);
       addToHistory(updatedTemplate);
@@ -731,7 +732,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
     // Find the element's location
     outerLoop: for (const column of template.columns) {
       for (const row of column.rows) {
-        const element = row.elements.find(element => 
+        const element = row.elements.find(element =>
           'id' in selectedElement && element.id === selectedElement.id);
 
         if (element) {
@@ -759,11 +760,11 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     // Create a deep copy to avoid mutation
     const updatedTemplate = deepCopy(template);
-    
+
     // Default to the first row and column if nothing is selected
     let targetRowId = 0;
     let targetColumnId = 0;
-    
+
     // If an element is selected, paste into that element's row and column
     if (selectedElement) {
       if ('id' in selectedElement) {
@@ -794,48 +795,61 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
       }
     }
-    
+
     // Find the target row
     let targetColumn = updatedTemplate.columns.find(c => c.order === targetColumnId);
     if (!targetColumn && updatedTemplate.columns.length > 0) {
       targetColumn = updatedTemplate.columns[0];
       targetColumnId = targetColumn.order;
     }
-    
+
     if (!targetColumn) {
       return; // No valid column found
     }
-    
+
     let targetRow = targetColumn.rows.find(r => r.order === targetRowId);
     if (!targetRow && targetColumn.rows.length > 0) {
       targetRow = targetColumn.rows[0];
       targetRowId = targetRow.order;
     }
-    
+
     if (!targetRow) {
       return; // No valid row found
     }
-    
+
     // Create a new element based on the clipboard element
     const newElement: TemplateElement = {
       ...deepCopy(clipboardElement),
       id: generateElementId(clipboardElement.type, targetRow.elements),
       order: targetRow.elements.length
     };
-    
+
     // Add slight offset if pasting to the same location
     if (targetRowId === clipboardRowId && targetColumnId === clipboardColumnId) {
       newElement.props.x = (newElement.props.x || 0) + 5;
       newElement.props.y = (newElement.props.y || 0) + 5;
     }
-    
+
     // Add the element to the target row
     targetRow.elements.push(newElement);
-    
+
     // Update the template
     setTemplate(updatedTemplate);
     addToHistory(updatedTemplate);
     setSelectedElement(newElement);
+  };
+
+  // Add this function to your TemplateProvider component
+  const duplicateElement = () => {
+    if (!selectedElement || !('id' in selectedElement)) {
+      return; // Only template elements can be duplicated (not rows or columns)
+    }
+
+    // First copy the element
+    copyElement();
+
+    // Then paste it right away
+    pasteElement();
   };
 
   return (
@@ -871,7 +885,8 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
         cutElement,
         copyElement,
         pasteElement,
-        canPaste: clipboardElement !== null
+        canPaste: clipboardElement !== null,
+        duplicateElement
       }}
     >
       {children}
