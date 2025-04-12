@@ -622,70 +622,75 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
   } | null>(null);
 
   // Table column properties update
-  const updateTableColumnProps = useCallback((elementId: string, columnId: string, props: Partial<ElementProps> & { name?: string }) => {
-    setTemplate(prevTemplate => {
-      const newTemplate = deepCopy(prevTemplate);
-      let found = false;
+const updateTableColumnProps = useCallback((elementId: string, columnId: string, props: Partial<ElementProps> & { name?: string, title?: string }) => {
+  setTemplate(prevTemplate => {
+    const newTemplate = deepCopy(prevTemplate);
+    let found = false;
 
-      // Extract name from props if present
-      const { name, ...otherProps } = props as any;
+    // Extract name and title from props if present
+    const { name, title, ...otherProps } = props as any;
+    
+    for (let c = 0; c < newTemplate.columns.length && !found; c++) {
+      const column = newTemplate.columns[c];
       
-      for (let c = 0; c < newTemplate.columns.length && !found; c++) {
-        const column = newTemplate.columns[c];
+      for (let r = 0; r < column.rows.length && !found; r++) {
+        const row = column.rows[r];
         
-        for (let r = 0; r < column.rows.length && !found; r++) {
-          const row = column.rows[r];
+        const elementIndex = row.elements.findIndex(el => el.id === elementId);
+        if (elementIndex >= 0 && row.elements[elementIndex].type === 'table') {
+          const element = row.elements[elementIndex];
           
-          const elementIndex = row.elements.findIndex(el => el.id === elementId);
-          if (elementIndex >= 0 && row.elements[elementIndex].type === 'table') {
-            const element = row.elements[elementIndex];
+          if (Array.isArray(element.values) && element.values.length > 0) {
+            const tableData = { ...element.values[0] };
             
-            if (Array.isArray(element.values) && element.values.length > 0) {
-              const tableData = { ...element.values[0] };
-              
-              // Find the column in the table
-              const columnIndex = tableData.columns.findIndex(col => col.id === columnId);
-              if (columnIndex >= 0) {
-                // Update column props
-                const updatedColumn = {
-                  ...tableData.columns[columnIndex],
-                  props: {
-                    ...tableData.columns[columnIndex].props,
-                    ...otherProps
-                  }
-                };
-                
-                // Add name if provided
-                if (name !== undefined) {
-                  updatedColumn.name = name;
+            // Find the column in the table
+            const columnIndex = tableData.columns.findIndex(col => col.id === columnId);
+            if (columnIndex >= 0) {
+              // Update column props
+              const updatedColumn = {
+                ...tableData.columns[columnIndex],
+                props: {
+                  ...tableData.columns[columnIndex].props,
+                  ...otherProps
                 }
-                
-                // Update the table data
-                tableData.columns = [
-                  ...tableData.columns.slice(0, columnIndex),
-                  updatedColumn,
-                  ...tableData.columns.slice(columnIndex + 1)
-                ];
-                
-                // Update the element values
-                element.values = [tableData];
-                
-                found = true;
-                break;
+              };
+              
+              // Add name if provided
+              if (name !== undefined) {
+                updatedColumn.name = name;
               }
+              
+              // Add title if provided 
+              if (title !== undefined) {
+                updatedColumn.title = title || undefined; // Don't store empty strings
+              }
+              
+              // Update the table data
+              tableData.columns = [
+                ...tableData.columns.slice(0, columnIndex),
+                updatedColumn,
+                ...tableData.columns.slice(columnIndex + 1)
+              ];
+              
+              // Update the element values
+              element.values = [tableData];
+              
+              found = true;
+              break;
             }
           }
         }
       }
-      
-      // Add to history if found and updated
-      if (found) {
-        addHistoryEntry(newTemplate);
-      }
-      
-      return newTemplate;
-    });
-  }, [addHistoryEntry]);
+    }
+    
+    // Add to history if found and updated
+    if (found) {
+      addHistoryEntry(newTemplate);
+    }
+    
+    return newTemplate;
+  });
+}, [addHistoryEntry]);
 
   // Table row properties update
   const updateTableRowProps = useCallback((elementId: string, rowId: string, props: Partial<ElementProps> & { title?: string }) => {

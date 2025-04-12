@@ -36,6 +36,16 @@ const Tree: React.FC = () => {
     return element.title || defaultLabel;
   };
   
+  // Get table column title or default
+  const getColumnTitle = (column: any, index: number) => {
+    // Use title for tree view if available
+    if (column.title) return column.title;
+    // If no title, use name as fallback (what's displayed in the table)
+    if (column.name) return column.name;
+    // If neither is available, use default format
+    return `Column ${index + 1}`;
+  };
+  
   return (
     <div className="tree">
       <div className="tree-header">
@@ -105,10 +115,10 @@ const Tree: React.FC = () => {
                               label="Columns"
                               isExpanded={true}
                             >
-                              {tableData.columns.map((col: any) => (
+                              {tableData.columns.map((col: any, index: number) => (
                                 <TreeItem
                                   key={col.id}
-                                  label={col.name}
+                                  label={getColumnTitle(col, index)}
                                   isSelected={selectedTableElement?.elementId === element.id && 
                                               selectedTableElement?.type === 'column' && 
                                               selectedTableElement?.id === col.id}

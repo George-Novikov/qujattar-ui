@@ -1,27 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { TemplateElement } from '../../models/Template';
+import { TemplateElement, TableColumn, TableRow, ElementProps } from '../../models/Template';
 import './Canvas.css';
 
-interface TableColumn {
-  id: string;
-  name: string;
-  width: number;
-  properties: {
-    backgroundColor?: string;
-    textColor?: string;
-    align?: 'left' | 'center' | 'right';
-    fontWeight?: 'normal' | 'bold';
-  };
+// Define custom interface that extends ElementProps with the additional properties needed
+interface TableColumnProps extends ElementProps {
+  fontWeight?: string;  // Add fontWeight property that's missing from ElementProps
 }
 
-interface TableRow {
-  id: string;
-  cells: { [columnId: string]: string };
-  height?: number;
+// Update TableColumn interface to use the extended props type
+interface TableColumnWithExtendedProps extends Omit<TableColumn, 'props'> {
+  props: TableColumnProps;
 }
 
-interface TableData {
-  columns: TableColumn[];
+// Define TableElementData interface
+interface TableElementData {
+  columns: TableColumnWithExtendedProps[];
   rows: TableRow[];
   settings: {
     borders: boolean;
@@ -47,17 +40,17 @@ const AdvancedTableElement: React.FC<AdvancedTableElementProps> = ({
   updateElementValues 
 }) => {
   // Convert element values to structured table data
-  const [tableData, setTableData] = useState<TableData>(() => {
+  const [tableData, setTableData] = useState<TableElementData>(() => {
     // Initialize from existing element values or create default
     if (Array.isArray(element.values) && element.values.length > 0) {
       try {
         // If element.values already has our structure
         if (element.values[0]?.columns) {
-          return element.values[0] as TableData;
+          return element.values[0] as TableElementData;
         }
         
         // Convert from flat structure to our enhanced structure
-        const columns: TableColumn[] = [];
+        const columns: TableColumnWithExtendedProps[] = [];
         const existingData = element.values[0] || {};
         
         // Create columns from first row keys
@@ -65,10 +58,13 @@ const AdvancedTableElement: React.FC<AdvancedTableElementProps> = ({
           columns.push({
             id: `col_${index}`,
             name: key,
-            width: DEFAULT_COLUMN_WIDTH,
-            properties: {
-              align: 'left',
-              fontWeight: index === 0 ? 'bold' : 'normal'
+            title: key, // Add a default title matching the name
+            order: index,
+            props: {
+              // Fix align property by using horizontalAlignment instead
+              horizontalAlignment: 'left',
+              fontWeight: index === 0 ? 'bold' : 'normal',
+              width: DEFAULT_COLUMN_WIDTH
             }
           });
         });
@@ -76,11 +72,13 @@ const AdvancedTableElement: React.FC<AdvancedTableElementProps> = ({
         // Create rows from values
         const rows: TableRow[] = element.values.map((rowData, index) => ({
           id: `row_${index}`,
+          order: index,
+          title: `Row ${index + 1}`, // Add a default title
+          props: { height: 30 },
           cells: Object.entries(rowData).reduce((acc, [key, value], colIndex) => {
             acc[`col_${colIndex}`] = value as string;
             return acc;
-          }, {} as { [key: string]: string }),
-          height: 30
+          }, {} as { [key: string]: string })
         }));
         
         return {
@@ -97,36 +95,7 @@ const AdvancedTableElement: React.FC<AdvancedTableElementProps> = ({
     }
     
     // Default structure with 2 columns and 1 row
-    return {
-      columns: [
-        { 
-          id: 'col_0', 
-          name: 'Column 1', 
-          width: DEFAULT_COLUMN_WIDTH,
-          properties: { align: 'left', fontWeight: 'bold' } 
-        },
-        { 
-          id: 'col_1', 
-          name: 'Column 2', 
-          width: DEFAULT_COLUMN_WIDTH,
-          properties: { align: 'left', fontWeight: 'normal' } 
-        }
-      ],
-      rows: [
-        {
-          id: 'row_0',
-          cells: {
-            'col_0': '',
-            'col_1': ''
-          },
-          height: 30
-        }
-      ],
-      settings: {
-        borders: true,
-        headerRow: true
-      }
-    };
+    return createDefaultTableData();
   });
   
   // Track which column is being resized
@@ -140,6 +109,50 @@ const AdvancedTableElement: React.FC<AdvancedTableElementProps> = ({
   
   // Refs
   const tableRef = useRef<HTMLTableElement>(null);
+  
+  // Create default table data structure
+  const createDefaultTableData = (): TableElementData => {
+    // Create default table structure
+    return {
+      columns: [
+        { 
+          id: 'col_0', 
+          name: 'Column 1', 
+          title: 'Column 1', // Add title matching name 
+          order: 0, 
+          props: { 
+            width: DEFAULT_COLUMN_WIDTH,
+            horizontalAlignment: 'left',
+            fontWeight: 'bold'
+          } 
+        },
+        { 
+          id: 'col_1', 
+          name: 'Column 2',
+          title: 'Column 2', // Add title matching name
+          order: 1, 
+          props: { 
+            width: DEFAULT_COLUMN_WIDTH,
+            horizontalAlignment: 'left',
+            fontWeight: 'normal'
+          } 
+        }
+      ],
+      rows: [
+        {
+          id: 'row_0',
+          order: 0,
+          title: 'Row 1', // Add default title
+          props: { height: 30 },
+          cells: { 'col_0': '', 'col_1': '' }
+        }
+      ],
+      settings: {
+        borders: true,
+        headerRow: true
+      }
+    };
+  };
   
   // Save table data whenever it changes
   useEffect(() => {
@@ -156,20 +169,24 @@ const AdvancedTableElement: React.FC<AdvancedTableElementProps> = ({
   // Add a new column
   const addColumn = () => {
     setTableData(prev => {
-      const newColumnId = `col_${prev.columns.length}`;
+      const columnIndex = prev.columns.length;
+      const newColumnId = `col_${columnIndex}`;
+      const columnName = `Column ${columnIndex + 1}`;
       
-      // Create new column
-      const newColumn: TableColumn = {
+      // Create new column with a title that matches its name initially
+      const newColumn: TableColumnWithExtendedProps = {
         id: newColumnId,
-        name: `Column ${prev.columns.length + 1}`,
-        width: DEFAULT_COLUMN_WIDTH,
-        properties: {
-          align: 'left',
+        name: columnName,
+        title: columnName, // Set default title to match name
+        order: columnIndex,
+        props: {
+          width: DEFAULT_COLUMN_WIDTH,
+          horizontalAlignment: 'left',
           fontWeight: 'normal'
         }
       };
       
-      // Add cell to each row for this column
+      // Add cell for this column to each row
       const updatedRows = prev.rows.map(row => ({
         ...row,
         cells: {
@@ -189,9 +206,11 @@ const AdvancedTableElement: React.FC<AdvancedTableElementProps> = ({
   // Add a new row
   const addRow = () => {
     setTableData(prev => {
-      const newRowId = `row_${prev.rows.length}`;
+      const rowIndex = prev.rows.length;
+      const newRowId = `row_${rowIndex}`;
+      const rowTitle = `Row ${rowIndex + 1}`;
       
-      // Create empty cells for all columns
+      // Create cells for all columns
       const cells: { [key: string]: string } = {};
       prev.columns.forEach(col => {
         cells[col.id] = '';
@@ -199,8 +218,10 @@ const AdvancedTableElement: React.FC<AdvancedTableElementProps> = ({
       
       const newRow: TableRow = {
         id: newRowId,
-        cells,
-        height: 30
+        order: rowIndex,
+        title: rowTitle, // Set a default title
+        props: { height: 30 },
+        cells
       };
       
       return {
@@ -298,7 +319,8 @@ const AdvancedTableElement: React.FC<AdvancedTableElementProps> = ({
     
     setResizingColumnId(columnId);
     setResizeStartX(e.clientX);
-    setInitialWidth(column.width);
+    // Fix: Use column.props.width
+    setInitialWidth(column.props.width || DEFAULT_COLUMN_WIDTH);
     
     // Add event listeners to window
     window.addEventListener('mousemove', handleColumnResize);
@@ -317,7 +339,10 @@ const AdvancedTableElement: React.FC<AdvancedTableElementProps> = ({
         if (col.id === resizingColumnId) {
           return {
             ...col,
-            width: newWidth
+            props: {
+              ...col.props,
+              width: newWidth
+            }
           };
         }
         return col;
@@ -338,14 +363,14 @@ const AdvancedTableElement: React.FC<AdvancedTableElementProps> = ({
   };
   
   // Update column properties
-  const updateColumnProperties = (columnId: string, properties: Partial<TableColumn['properties']>) => {
+  const updateColumnProperties = (columnId: string, properties: Partial<TableColumnProps>) => {
     setTableData(prev => {
       const updatedColumns = prev.columns.map(col => {
         if (col.id === columnId) {
           return {
             ...col,
-            properties: {
-              ...col.properties,
+            props: {
+              ...col.props,
               ...properties
             }
           };
@@ -377,7 +402,7 @@ const AdvancedTableElement: React.FC<AdvancedTableElementProps> = ({
   };
   
   // Calculate total width
-  const totalWidth = tableData.columns.reduce((sum, col) => sum + col.width, 0);
+  const totalWidth = tableData.columns.reduce((sum, col) => sum + (col.props.width || DEFAULT_COLUMN_WIDTH), 0);
   
   return (
     <div className="advanced-table" onClick={(e) => e.stopPropagation()}>
@@ -385,7 +410,9 @@ const AdvancedTableElement: React.FC<AdvancedTableElementProps> = ({
         <table ref={tableRef} style={{ width: '100%', borderCollapse: 'collapse' }}>
           <colgroup>
             {tableData.columns.map(column => (
-              <col key={column.id} style={{ width: `${(column.width / totalWidth) * 100}%` }} />
+              <col key={column.id} style={{ 
+                width: `${((column.props.width || DEFAULT_COLUMN_WIDTH) / totalWidth) * 100}%` 
+              }} />
             ))}
             <col style={{ width: '30px' }} /> {/* Actions column */}
           </colgroup>
@@ -398,8 +425,8 @@ const AdvancedTableElement: React.FC<AdvancedTableElementProps> = ({
                     position: 'relative',
                     padding: '0', 
                     border: tableData.settings.borders ? '1px solid #ccc' : 'none',
-                    backgroundColor: column.properties.backgroundColor || 'transparent',
-                    color: column.properties.textColor || 'inherit'
+                    backgroundColor: column.props.background || 'transparent',
+                    color: column.props.color || 'inherit'
                   }}
                 >
                   <div className="column-header-container">
@@ -415,8 +442,8 @@ const AdvancedTableElement: React.FC<AdvancedTableElementProps> = ({
                         }}
                         style={{ 
                           width: '100%', 
-                          textAlign: column.properties.align || 'left', 
-                          fontWeight: column.properties.fontWeight || 'bold',
+                          textAlign: column.props.horizontalAlignment || 'left', 
+                          fontWeight: column.props.fontWeight || 'normal',
                           border: 'none',
                           padding: '4px',
                           background: 'transparent'
@@ -457,9 +484,9 @@ const AdvancedTableElement: React.FC<AdvancedTableElementProps> = ({
                         <div className="settings-item">
                           <label>Alignment:</label>
                           <select 
-                            value={column.properties.align || 'left'} 
+                            value={column.props.horizontalAlignment || 'left'} 
                             onChange={(e) => updateColumnProperties(column.id, { 
-                              align: e.target.value as 'left' | 'center' | 'right' 
+                              horizontalAlignment: e.target.value as 'left' | 'center' | 'right' 
                             })}
                           >
                             <option value="left">Left</option>
@@ -471,9 +498,9 @@ const AdvancedTableElement: React.FC<AdvancedTableElementProps> = ({
                         <div className="settings-item">
                           <label>Font Weight:</label>
                           <select 
-                            value={column.properties.fontWeight || 'normal'} 
+                            value={column.props.fontWeight || 'normal'} 
                             onChange={(e) => updateColumnProperties(column.id, { 
-                              fontWeight: e.target.value as 'normal' | 'bold' 
+                              fontWeight: e.target.value
                             })}
                           >
                             <option value="normal">Normal</option>
@@ -485,9 +512,9 @@ const AdvancedTableElement: React.FC<AdvancedTableElementProps> = ({
                           <label>Background:</label>
                           <input 
                             type="color" 
-                            value={column.properties.backgroundColor || '#ffffff'} 
+                            value={column.props.background || '#ffffff'} 
                             onChange={(e) => updateColumnProperties(column.id, { 
-                              backgroundColor: e.target.value 
+                              background: e.target.value 
                             })}
                           />
                         </div>
@@ -496,9 +523,9 @@ const AdvancedTableElement: React.FC<AdvancedTableElementProps> = ({
                           <label>Text Color:</label>
                           <input 
                             type="color" 
-                            value={column.properties.textColor || '#000000'} 
+                            value={column.props.color || '#000000'} 
                             onChange={(e) => updateColumnProperties(column.id, { 
-                              textColor: e.target.value 
+                              color: e.target.value 
                             })}
                           />
                         </div>
@@ -527,7 +554,7 @@ const AdvancedTableElement: React.FC<AdvancedTableElementProps> = ({
           </thead>
           <tbody>
             {tableData.rows.map((row, rowIndex) => (
-              <tr key={row.id} style={{ height: `${row.height}px` }}>
+              <tr key={row.id} style={{ height: `${row.props.height || 30}px` }}>
                 {tableData.columns.map(column => (
                   <td 
                     key={`${row.id}-${column.id}`} 
@@ -551,7 +578,7 @@ const AdvancedTableElement: React.FC<AdvancedTableElementProps> = ({
                         border: 'none',
                         padding: '4px',
                         background: 'transparent',
-                        textAlign: column.properties.align || 'left'
+                        textAlign: column.props.horizontalAlignment || 'left'
                       }}
                     />
                   </td>

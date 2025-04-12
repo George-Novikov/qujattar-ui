@@ -1,12 +1,12 @@
 import React from 'react';
 import { useTemplate } from '../../context/TemplateContext';
 import { useAppSettings } from '../../context/AppSettingsContext';
-import ElementProperties from './ElementProperties';
+import ElementProperties, { TableColumnProperties, TableRowProperties } from './ElementProperties';
 import TemplateProperties from './TemplateProperties';
 import './Properties.css';
 
 const Properties: React.FC = () => {
-  const { template, selectedElement } = useTemplate();
+  const { template, selectedElement, selectedTableElement } = useTemplate();
   const { settings } = useAppSettings();
   
   if (!settings.showProperties) {
@@ -20,7 +20,13 @@ const Properties: React.FC = () => {
       </div>
       
       <div className="properties-content">
-        {selectedElement ? (
+        {selectedTableElement ? (
+          selectedTableElement.type === 'column' ? (
+            <TableColumnProperties />
+          ) : (
+            <TableRowProperties />
+          )
+        ) : selectedElement ? (
           <ElementProperties element={selectedElement} />
         ) : (
           <TemplateProperties template={template} />

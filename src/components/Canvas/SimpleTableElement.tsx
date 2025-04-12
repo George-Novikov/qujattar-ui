@@ -92,31 +92,41 @@ const SimpleTableElement: React.FC<SimpleTableElementProps> = ({
   };
 
   // Add new column
-  const addColumn = () => {
-    setTableData(prev => {
-      const newColumnId = `col_${prev.columns.length}`;
-      
-      // Create new column
-      const newColumn = {
-        id: newColumnId,
-        name: `Column ${prev.columns.length + 1}`,
-        order: prev.columns.length,
-        props: { width: 100 }
-      };
-      
-      // Add cell for this column to each row
-      const updatedRows = prev.rows.map(row => ({
-        ...row,
-        cells: { ...row.cells, [newColumnId]: '' }
-      }));
-      
-      return {
-        ...prev,
-        columns: [...prev.columns, newColumn],
-        rows: updatedRows
-      };
-    });
-  };
+const addColumn = () => {
+  setTableData(prev => {
+    const columnIndex = prev.columns.length;
+    const newColumnId = `col_${columnIndex}`;
+    const columnName = `Column ${columnIndex + 1}`;
+    
+    // Create new column with a title that matches its name initially
+    const newColumn: TableColumn = {
+      id: newColumnId,
+      name: columnName,
+      title: columnName, // Set default title to match name
+      order: columnIndex,
+      props: {
+        width: DEFAULT_COLUMN_WIDTH,
+        align: 'left',
+        fontWeight: 'normal'
+      }
+    };
+    
+    // Add cell for this column to each row
+    const updatedRows = prev.rows.map(row => ({
+      ...row,
+      cells: {
+        ...row.cells,
+        [newColumnId]: ''
+      }
+    }));
+    
+    return {
+      ...prev,
+      columns: [...prev.columns, newColumn],
+      rows: updatedRows
+    };
+  });
+};
 
   // Calculate column widths as percentages
   const totalWidth = tableData.columns.reduce((sum, col) => 

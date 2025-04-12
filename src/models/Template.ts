@@ -143,6 +143,7 @@ export interface TableColumn {
   name: string;
   order: number;
   props: ElementProps;
+  title?: string;
 }
 
 export interface TableRow {

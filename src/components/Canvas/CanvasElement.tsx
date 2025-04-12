@@ -19,7 +19,7 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
   isSelected,
   onClick
 }) => {
-  const { updateElementProps, updateElementValues, setSelectedTableElement, updateTableRowProps } = useTemplate();
+  const { updateElementProps, updateElementValues, setSelectedTableElement, updateTableRowProps, selectedTableElement } = useTemplate();
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -182,8 +182,8 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
     // Only allow dragging when clicking directly on the element or its container
     // but not on any inputs, buttons, table cells etc
     const target = e.target as HTMLElement;
-    const isInputOrControl = 
-      target instanceof HTMLInputElement || 
+    const isInputOrControl =
+      target instanceof HTMLInputElement ||
       target instanceof HTMLButtonElement ||
       target instanceof HTMLTableCellElement ||
       target instanceof HTMLTableRowElement ||
@@ -195,7 +195,7 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
       target.tagName.toLowerCase() === 'tbody' ||
       target.classList.contains('hierarchical-table') ||
       target.classList.contains('table-actions');
-    
+
     if (element.type === 'table' && isInputOrControl) {
       return;
     }
@@ -283,17 +283,30 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
   };
 
   // Create default table data structure
-  const createDefaultTableData = (element) => {
+  const createDefaultTableData = () => {
     // Create default table structure
     return {
       columns: [
-        { id: 'col_0', name: 'Column 1', order: 0, props: { width: 100 } },
-        { id: 'col_1', name: 'Column 2', order: 1, props: { width: 100 } }
+        {
+          id: 'col_0',
+          name: 'Column 1',
+          title: 'Column 1', // Add title matching name 
+          order: 0,
+          props: { width: 100 }
+        },
+        {
+          id: 'col_1',
+          name: 'Column 2',
+          title: 'Column 2', // Add title matching name
+          order: 1,
+          props: { width: 100 }
+        }
       ],
       rows: [
         {
           id: 'row_0',
           order: 0,
+          title: 'Row 1', // Add default title
           props: { height: 30 },
           cells: { 'col_0': '', 'col_1': '' }
         }
@@ -310,15 +323,15 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
     // Calculate appropriate size based on column count and row count
     const columnCount = tableData.columns.length;
     const rowCount = tableData.rows.length;
-    
+
     // Base size for the table
     const baseWidth = 20; // per column
     const baseHeight = 5; // per row
-    
+
     // Calculate new dimensions (with some minimum values)
     const newWidth = Math.max(20, baseWidth * columnCount);
     const newHeight = Math.max(10, baseHeight * rowCount);
-    
+
     // Update element properties
     updateElementProps(element.id, {
       width: newWidth,
@@ -332,28 +345,28 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
     const rect = e.currentTarget.getBoundingClientRect();
     const bottomEdge = rect.bottom;
     const clickY = e.clientY;
-    
+
     if (Math.abs(clickY - bottomEdge) <= 5) {
       e.stopPropagation();
       e.preventDefault();
-      
+
       const startY = e.clientY;
       const startHeight = row.props.height || 30;
-      
+
       const handleMouseMove = (moveEvent: MouseEvent) => {
         moveEvent.preventDefault();
         const deltaY = moveEvent.clientY - startY;
         const newHeight = Math.max(20, startHeight + deltaY);
-        
+
         // Update row height
         updateTableRowProps(element.id, row.id, { height: newHeight });
       };
-      
+
       const handleMouseUp = () => {
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
       };
-      
+
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
     }
@@ -467,6 +480,10 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
           </div>
         );
 
+      // In the renderViewContent function, table case
+
+      // Update the table rendering in CanvasElement.tsx
+
       case 'table':
         return (
           <div className="element-content table-element">
@@ -474,14 +491,11 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
               // Convert the element values to our structured format if needed
               const tableData = Array.isArray(element.values) && element.values[0]?.columns
                 ? element.values[0]
-                : createDefaultTableData(element);
+                : createDefaultTableData();
 
               // Calculate column widths
               const totalWidth = tableData.columns.reduce((sum, col) =>
                 sum + (col.props.width || 100), 0);
-
-              // Track which elements are selected
-              const { selectedTableElement } = useTemplate();
 
               return (
                 <div className="hierarchical-table" onClick={(e) => e.stopPropagation()}>
@@ -547,7 +561,6 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
                               id: row.id
                             });
                           }}
-                          onMouseDown={(e) => handleRowResize(row, e)}
                         >
                           {tableData.columns.map((column) => (
                             <td
@@ -600,38 +613,47 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
                       ))}
                     </tbody>
                   </table>
+
+                  {/* Add Table Actions - Add Column and Add Row buttons */}
                   <div className="table-actions" style={{ marginTop: '5px', display: 'flex', gap: '5px' }}>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
 
-                        // Create a new column
-                        const newColumnId = `col_${tableData.columns.length}`;
+                        // Add new column
+                        const columnIndex = tableData.columns.length;
+                        const newColumnId = `col_${columnIndex}`;
+                        const columnName = `Column ${columnIndex + 1}`;
+
+                        // Create new column with title
                         const newColumn = {
                           id: newColumnId,
-                          name: `Column ${tableData.columns.length + 1}`,
-                          order: tableData.columns.length,
-                          props: { width: 100 }
+                          name: columnName,
+                          title: columnName,
+                          order: columnIndex,
+                          props: {
+                            width: 100,
+                            horizontalAlignment: 'left'
+                          }
                         };
 
-                        // Add cells for this column to all rows
-                        const updatedRows = tableData.rows.map(r => ({
-                          ...r,
-                          cells: { ...r.cells, [newColumnId]: '' }
+                        // Add cell for this column to each row
+                        const updatedRows = tableData.rows.map(row => ({
+                          ...row,
+                          cells: {
+                            ...row.cells,
+                            [newColumnId]: ''
+                          }
                         }));
 
-                        const updatedTableData = {
+                        // Update the element values
+                        updateElementValues(element.id, [{
                           ...tableData,
                           columns: [...tableData.columns, newColumn],
                           rows: updatedRows
-                        };
-
-                        // Update the element values
-                        updateElementValues(element.id, [updatedTableData]);
-                        
-                        // Adjust table size
-                        adjustTableSize(updatedTableData);
+                        }]);
                       }}
+                      style={{ flex: 1, padding: '4px' }}
                     >
                       Add Column
                     </button>
@@ -639,37 +661,50 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
                       onClick={(e) => {
                         e.stopPropagation();
 
-                        // Create a new row
-                        const newRowId = `row_${tableData.rows.length}`;
+                        // Add new row
+                        const rowIndex = tableData.rows.length;
+                        const newRowId = `row_${rowIndex}`;
+                        const rowTitle = `Row ${rowIndex + 1}`;
 
                         // Create cells for all columns
-                        const cells = {};
+                        const cells: { [key: string]: string } = {};
                         tableData.columns.forEach(col => {
                           cells[col.id] = '';
                         });
 
                         const newRow = {
                           id: newRowId,
-                          order: tableData.rows.length,
+                          order: rowIndex,
+                          title: rowTitle,
                           props: { height: 30 },
                           cells
                         };
 
-                        const updatedTableData = {
+                        // Update the element values
+                        updateElementValues(element.id, [{
                           ...tableData,
                           rows: [...tableData.rows, newRow]
-                        };
-
-                        // Update the element values
-                        updateElementValues(element.id, [updatedTableData]);
-                        
-                        // Adjust table size
-                        adjustTableSize(updatedTableData);
+                        }]);
                       }}
+                      style={{ flex: 1, padding: '4px' }}
                     >
                       Add Row
                     </button>
                   </div>
+
+                  {/* Add visual indicator for selected elements */}
+                  <style>
+                    {`
+                .selected-column {
+                  outline: 2px solid var(--color-scheme, #0077ff) !important;
+                  z-index: 1;
+                }
+                .selected-row {
+                  outline: 2px solid var(--color-scheme, #0077ff) !important;
+                  z-index: 1;
+                }
+              `}
+                  </style>
                 </div>
               );
             })()}
