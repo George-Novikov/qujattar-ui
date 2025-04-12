@@ -60,12 +60,14 @@ export interface Column {
   order: number;
   props: ElementProps;
   rows: Row[];
+  title?: string; // Added title field
 }
 
 export interface Row {
   order: number;
   props: ElementProps;
   elements: TemplateElement[];
+  title?: string; // Added title field
 }
 
 export type ElementType = 
@@ -87,6 +89,7 @@ export interface TemplateElement {
   type: ElementType;
   values: any[];
   props: ElementProps;
+  title?: string; // Added title field
 }
 
 // Helper function to create a new template with default values
@@ -118,9 +121,11 @@ export const createNewTemplate = (): Template => {
               x: 50,
               y: 50
             },
-            elements: []
+            elements: [],
+            title: 'Row 1'
           }
-        ]
+        ],
+        title: 'Column 1'
       }
     ]
   };
@@ -145,6 +150,7 @@ export interface TableRow {
   order: number;
   props: ElementProps;
   cells: { [columnId: string]: string };
+  title?: string; // Added title field
 }
 
 export interface TableElementData {

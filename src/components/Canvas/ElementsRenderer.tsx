@@ -31,6 +31,8 @@ const ElementsRenderer: React.FC = () => {
       <div
         key={`row-${columnId}-${row.order}`}
         className={`template-row ${isSelected ? 'selected' : ''}`}
+        data-row-id={row.order}
+        data-column-id={columnId}
         style={{
           position: 'absolute',
           left: `${row.props.x}%`,
@@ -59,6 +61,7 @@ const ElementsRenderer: React.FC = () => {
       <div
         key={`column-${column.order}`}
         className={`template-column ${isSelected ? 'selected' : ''}`}
+        data-column-id={column.order}
         style={{
           position: 'absolute',
           left: `${column.props.x}%`,

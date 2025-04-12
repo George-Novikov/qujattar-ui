@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TemplateElement, ElementProps, Row, Column } from '../../models/Template';
 import { useTemplate } from '../../context/TemplateContext';
 import ColorPicker from '../UI/ColorPicker';
@@ -12,10 +12,17 @@ interface ElementPropertiesProps {
 }
 
 const ElementProperties: React.FC<ElementPropertiesProps> = ({ element }) => {
-  const { updateElementProps, updateElementValues } = useTemplate();
+  const { 
+    updateElementProps, 
+    updateElementValues,
+    updateElementTitle,
+    updateColumnTitle,
+    updateRowTitle
+  } = useTemplate();
   
   // State for controlled inputs
   const [inputValues, setInputValues] = useState({
+    title: element.title || '',
     x: element.props.x || 0,
     y: element.props.y || 0,
     width: element.props.width || 0,
@@ -33,11 +40,14 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({ element }) => {
   
   // Check if element is a template element or structural element (row/column)
   const isTemplateElement = 'id' in element;
-  const elementType = isTemplateElement ? element.type : ('rows' in element ? 'column' : 'row');
+  const isColumn = 'rows' in element;
+  const isRow = 'elements' in element && !isColumn && !isTemplateElement;
+  const elementType = isTemplateElement ? element.type : (isColumn ? 'column' : 'row');
   
   // Update local state when element changes
-  React.useEffect(() => {
+  useEffect(() => {
     setInputValues({
+      title: element.title || '',
       x: element.props.x || 0,
       y: element.props.y || 0,
       width: element.props.width || 0,
@@ -56,11 +66,28 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({ element }) => {
   
   // Helper function to update properties
   const handleUpdateProps = (props: Partial<ElementProps>) => {
-    if (isTemplateElement) {
+    if (isTemplateElement && 'id' in element) {
       updateElementProps(element.id, props);
     }
-    // For row or column, we would update their respective properties
-    // This would require additional functions in the context that we'd implement
+    // For rows and columns, updates are handled separately through specialized functions
+  };
+  
+  // Handle title update
+  const handleUpdateTitle = (title: string) => {
+    if (isTemplateElement && 'id' in element) {
+      updateElementTitle(element.id, title);
+    } else if (isColumn && 'order' in element) {
+      updateColumnTitle(element.order, title);
+    } else if (isRow && 'order' in element) {
+      // Find the column this row belongs to
+      for (const column of document.querySelectorAll('.template-column')) {
+        const columnId = parseInt(column.getAttribute('data-column-id') || '0');
+        if (column.contains(document.querySelector(`[data-row-id="${element.order}"]`))) {
+          updateRowTitle(columnId, element.order, title);
+          break;
+        }
+      }
+    }
   };
   
   // Handle controlled input changes
@@ -71,7 +98,11 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({ element }) => {
   
   // Submit changes when input loses focus
   const handleInputBlur = (property: string) => {
-    handleUpdateProps({ [property]: inputValues[property] });
+    if (property === 'title') {
+      handleUpdateTitle(inputValues.title);
+    } else {
+      handleUpdateProps({ [property]: inputValues[property] });
+    }
   };
   
   // Handle controlled checkbox changes
@@ -83,10 +114,10 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({ element }) => {
   const getElementLabel = () => {
     if (isTemplateElement) {
       return `${element.type.charAt(0).toUpperCase() + element.type.slice(1)} ${element.id.split('-')[1]}`;
-    } else if ('rows' in element) {
-      return `Column ${element.order + 1}`;
+    } else if (isColumn) {
+      return `Column ${(element as Column).order + 1}`;
     } else {
-      return `Row ${element.order + 1}`;
+      return `Row ${(element as Row).order + 1}`;
     }
   };
   
@@ -94,6 +125,24 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({ element }) => {
     <div className="element-properties">
       <div className="properties-section">
         <h3 className="properties-section-title">{getElementLabel()}</h3>
+      </div>
+      
+      {/* Title Field */}
+      <div className="properties-section">
+        <h4 className="properties-section-subtitle">Element Title</h4>
+        
+        <div className="properties-row">
+          <div className="properties-field">
+            <label>Title</label>
+            <input
+              type="text"
+              value={inputValues.title}
+              onChange={(e) => handleInputChange(e, 'title')}
+              onBlur={() => handleInputBlur('title')}
+              placeholder={getElementLabel()}
+            />
+          </div>
+        </div>
       </div>
       
       {/* Position and Size */}
@@ -171,6 +220,7 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({ element }) => {
         </div>
       </div>
       
+      {/* Rest of the properties component remains unchanged */}
       {/* Appearance */}
       <div className="properties-section">
         <h4 className="properties-section-subtitle">Appearance</h4>
@@ -459,7 +509,7 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({ element }) => {
 
 export const TableColumnProperties: React.FC = () => {
   const { 
-    selectedElement, 
+    selectedElement,
     selectedTableElement,
     updateTableColumnProps,
     deleteTableColumn
@@ -469,7 +519,7 @@ export const TableColumnProperties: React.FC = () => {
     return null;
   }
   
-  // @ts-ignore
+  // @ts-ignore - assumes selectedElement is a TemplateElement
   const tableData = selectedElement.values[0];
   if (!tableData || !tableData.columns) {
     return null;
@@ -497,12 +547,8 @@ export const TableColumnProperties: React.FC = () => {
           onClick={() => {
             const newName = prompt('Enter new column name', column.name);
             if (newName) {
-              const updatedColumn = {...column, name: newName};
-              const updatedColumns = tableData.columns.map(col => 
-                col.id === column.id ? updatedColumn : col
-              );
-              // @ts-ignore
-              updateTableColumnProps(selectedElement.id, column.id, { name: newName });
+              // Update column name
+              handleUpdateProps({ name: newName });
             }
           }}
         >
@@ -612,11 +658,14 @@ export const TableRowProperties: React.FC = () => {
     deleteTableRow
   } = useTemplate();
   
+  // New state for row title
+  const [rowTitle, setRowTitle] = useState('');
+  
   if (!selectedElement || !selectedTableElement || selectedTableElement.type !== 'row') {
     return null;
   }
   
-  // @ts-ignore
+  // @ts-ignore - assumes selectedElement is a TemplateElement
   const tableData = selectedElement.values[0];
   if (!tableData || !tableData.rows) {
     return null;
@@ -627,6 +676,11 @@ export const TableRowProperties: React.FC = () => {
   if (!row) {
     return null;
   }
+  
+  // Update row title state when row changes
+  useEffect(() => {
+    setRowTitle(row.title || '');
+  }, [row]);
   
   // Helper function to update properties
   const handleUpdateProps = (props: any) => {
@@ -652,6 +706,27 @@ export const TableRowProperties: React.FC = () => {
             Delete
           </Button>
         )}
+      </div>
+      
+      {/* Title field for row */}
+      <div className="properties-section">
+        <h4 className="properties-section-subtitle">Row Title</h4>
+        
+        <div className="properties-row">
+          <div className="properties-field">
+            <label>Title</label>
+            <input
+              type="text"
+              value={rowTitle}
+              onChange={(e) => setRowTitle(e.target.value)}
+              onBlur={() => {
+                // Update row title
+                handleUpdateProps({ title: rowTitle });
+              }}
+              placeholder={`Row ${tableData.rows.indexOf(row) + 1}`}
+            />
+          </div>
+        </div>
       </div>
       
       {/* Size */}
@@ -685,41 +760,6 @@ export const TableRowProperties: React.FC = () => {
             />
           </div>
         </div>
-      </div>
-    </div>
-  );
-};
-
-// In your Properties.tsx component, add this conditional rendering:
-
-const Properties: React.FC = () => {
-  const { selectedElement, selectedTableElement } = useTemplate();
-  // @ts-ignore
-  const { settings } = useAppSettings();
-  
-  if (!settings.showProperties) {
-    return null;
-  }
-  
-  return (
-    <div className="properties">
-      <div className="properties-header">
-        <span>Properties</span>
-      </div>
-      
-      <div className="properties-content">
-        {selectedTableElement ? (
-          selectedTableElement.type === 'column' ? (
-            <TableColumnProperties />
-          ) : (
-            <TableRowProperties />
-          )
-        ) : selectedElement ? (
-          <ElementProperties element={selectedElement} />
-        ) : (
-          // @ts-ignore
-          <TemplateProperties template={template} />
-        )}
       </div>
     </div>
   );

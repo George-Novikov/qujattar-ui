@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef, useCallback } from 'react';
 import {
   Template,
   TemplateElement,
@@ -49,6 +49,9 @@ interface TemplateContextProps {
   pasteElement: () => void;
   canPaste: boolean;
   duplicateElement: () => void;
+  updateElementTitle: (elementId: string, title: string) => void;
+  updateColumnTitle: (columnOrder: number, title: string) => void;
+  updateRowTitle: (columnOrder: number, rowOrder: number, title: string) => void;
 }
 
 const TemplateContext = createContext<TemplateContextProps | undefined>(undefined);
@@ -102,6 +105,13 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
     return JSON.parse(JSON.stringify(obj));
   };
 
+  // Helper for adding to history
+  const addHistoryEntry = useCallback((updatedTemplate: Template) => {
+    if (!isUndoRedoOperation.current) {
+      addToHistory(updatedTemplate);
+    }
+  }, [addToHistory]);
+
   const updateTemplateProps = (props: Partial<Template['props']>) => {
     const updatedTemplate = {
       ...deepCopy(template),
@@ -112,34 +122,143 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
     };
 
     setTemplate(updatedTemplate);
-    addToHistory(updatedTemplate);
+    addHistoryEntry(updatedTemplate);
   };
 
-  const updateElementProps = (elementId: string, props: Partial<ElementProps>) => {
-    // Create a deep copy to avoid mutation
-    const updatedTemplate = deepCopy(template);
-
-    // Find the element in the template
-    for (const column of updatedTemplate.columns) {
-      for (const row of column.rows) {
-        const elementIndex = row.elements.findIndex(element => element.id === elementId);
-
-        if (elementIndex !== -1) {
-          row.elements[elementIndex] = {
-            ...row.elements[elementIndex],
-            props: {
-              ...row.elements[elementIndex].props,
-              ...props
-            }
-          };
-
-          setTemplate(updatedTemplate);
-          addToHistory(updatedTemplate);
-          return;
+  // Update element title
+  const updateElementTitle = useCallback((elementId: string, title: string) => {
+    setTemplate(prevTemplate => {
+      const newTemplate = deepCopy(prevTemplate);
+      
+      // Find the element and update its title
+      let found = false;
+      
+      for (let c = 0; c < newTemplate.columns.length && !found; c++) {
+        const column = newTemplate.columns[c];
+        
+        for (let r = 0; r < column.rows.length && !found; r++) {
+          const row = column.rows[r];
+          
+          const elementIndex = row.elements.findIndex(el => el.id === elementId);
+          if (elementIndex >= 0) {
+            // Create a new element with the updated title
+            row.elements[elementIndex] = { 
+              ...row.elements[elementIndex],
+              title: title || undefined // Don't store empty strings
+            };
+            
+            found = true;
+            break;
+          }
         }
       }
-    }
-  };
+      
+      // Add to history if element was found and updated
+      if (found) {
+        addHistoryEntry(newTemplate);
+      }
+      
+      return newTemplate;
+    });
+  }, [addHistoryEntry]);
+  
+  // Update column title
+  const updateColumnTitle = useCallback((columnOrder: number, title: string) => {
+    setTemplate(prevTemplate => {
+      const newTemplate = deepCopy(prevTemplate);
+      
+      // Find the column by order
+      const columnIndex = newTemplate.columns.findIndex(col => col.order === columnOrder);
+      if (columnIndex >= 0) {
+        // Update column title
+        newTemplate.columns[columnIndex] = {
+          ...newTemplate.columns[columnIndex],
+          title: title || undefined // Don't store empty strings
+        };
+        
+        // Add to history
+        addHistoryEntry(newTemplate);
+      }
+      
+      return newTemplate;
+    });
+  }, [addHistoryEntry]);
+  
+  // Update row title
+  const updateRowTitle = useCallback((columnOrder: number, rowOrder: number, title: string) => {
+    setTemplate(prevTemplate => {
+      const newTemplate = deepCopy(prevTemplate);
+      
+      // Find the column by order
+      const columnIndex = newTemplate.columns.findIndex(col => col.order === columnOrder);
+      if (columnIndex >= 0) {
+        const column = newTemplate.columns[columnIndex];
+        
+        // Find the row by order
+        const rowIndex = column.rows.findIndex(row => row.order === rowOrder);
+        if (rowIndex >= 0) {
+          // Update row title
+          newTemplate.columns[columnIndex].rows[rowIndex] = {
+            ...column.rows[rowIndex],
+            title: title || undefined // Don't store empty strings
+          };
+          
+          // Add to history
+          addHistoryEntry(newTemplate);
+        }
+      }
+      
+      return newTemplate;
+    });
+  }, [addHistoryEntry]);
+
+  const updateElementProps = useCallback((elementId: string, props: Partial<ElementProps> & { title?: string }) => {
+    setTemplate(prevTemplate => {
+      const newTemplate = deepCopy(prevTemplate);
+      let found = false;
+      
+      // Extract title from props if present
+      const { title, ...otherProps } = props as any;
+      
+      for (let c = 0; c < newTemplate.columns.length && !found; c++) {
+        const column = newTemplate.columns[c];
+        
+        for (let r = 0; r < column.rows.length && !found; r++) {
+          const row = column.rows[r];
+          
+          const elementIndex = row.elements.findIndex(el => el.id === elementId);
+          if (elementIndex >= 0) {
+            // Create a new element with the updated props
+            const updatedElement = { 
+              ...row.elements[elementIndex],
+              props: {
+                ...row.elements[elementIndex].props,
+                ...otherProps
+              }
+            };
+            
+            // Add title if provided
+            if (title !== undefined) {
+              updatedElement.title = title || undefined; // Don't store empty strings
+            }
+            
+            // Update the element in the row
+            row.elements[elementIndex] = updatedElement;
+            
+            found = true;
+            break;
+          }
+        }
+      }
+      
+      // Add to history if element was found and updated
+      if (found) {
+        addHistoryEntry(newTemplate);
+      }
+      
+      return newTemplate;
+    });
+  }, [addHistoryEntry]);
 
   const addElement = (type: ElementType, rowId: number, columnId: number) => {
     // Create a deep copy to avoid mutation
@@ -153,6 +272,10 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const id = generateElementId(type, row.elements);
 
+    // Default title will be provided in the element structure
+    const typeCapitalized = type.charAt(0).toUpperCase() + type.slice(1);
+    const elementNumber = row.elements.filter(el => el.type === type).length + 1;
+    
     const newElement: TemplateElement = {
       id,
       order: row.elements.length,
@@ -163,13 +286,14 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
         width: 20,
         x: 50,
         y: 50
-      }
+      },
+      title: `${typeCapitalized} ${elementNumber}`
     };
 
     row.elements.push(newElement);
 
     setTemplate(updatedTemplate);
-    addToHistory(updatedTemplate);
+    addHistoryEntry(updatedTemplate);
     setSelectedElement(newElement);
   };
 
@@ -190,7 +314,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
           });
 
           setTemplate(updatedTemplate);
-          addToHistory(updatedTemplate);
+          addHistoryEntry(updatedTemplate);
 
           if (selectedElement && 'id' in selectedElement && selectedElement.id === elementId) {
             setSelectedElement(null);
@@ -239,7 +363,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
     targetRow.elements.push(elementToMove);
 
     setTemplate(updatedTemplate);
-    addToHistory(updatedTemplate);
+    addHistoryEntry(updatedTemplate);
   };
 
   const addRow = (columnId: number) => {
@@ -249,6 +373,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
     const column = updatedTemplate.columns.find(c => c.order === columnId);
     if (!column) return;
 
+    const rowNumber = column.rows.length + 1;
     const newRow: Row = {
       order: column.rows.length,
       props: {
@@ -257,13 +382,14 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
         x: column.props.x,
         y: column.rows.length === 0 ? column.props.y : column.rows[column.rows.length - 1].props.y + 10
       },
-      elements: []
+      elements: [],
+      title: `Row ${rowNumber}`
     };
 
     column.rows.push(newRow);
 
     setTemplate(updatedTemplate);
-    addToHistory(updatedTemplate);
+    addHistoryEntry(updatedTemplate);
     setSelectedElement(newRow);
   };
 
@@ -285,7 +411,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
     });
 
     setTemplate(updatedTemplate);
-    addToHistory(updatedTemplate);
+    addHistoryEntry(updatedTemplate);
 
     if (selectedElement && 'order' in selectedElement && selectedElement.order === rowId) {
       setSelectedElement(null);
@@ -296,6 +422,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
     // Create a deep copy to avoid mutation
     const updatedTemplate = deepCopy(template);
 
+    const columnNumber = updatedTemplate.columns.length + 1;
     const newColumn: Column = {
       order: updatedTemplate.columns.length,
       props: {
@@ -306,7 +433,8 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
           updatedTemplate.columns[updatedTemplate.columns.length - 1].props.width / 2,
         y: 50
       },
-      rows: []
+      rows: [],
+      title: `Column ${columnNumber}`
     };
 
     updatedTemplate.columns.push(newColumn);
@@ -317,7 +445,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
     });
 
     setTemplate(updatedTemplate);
-    addToHistory(updatedTemplate);
+    addHistoryEntry(updatedTemplate);
     setSelectedElement(newColumn);
   };
 
@@ -337,7 +465,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
     });
 
     setTemplate(updatedTemplate);
-    addToHistory(updatedTemplate);
+    addHistoryEntry(updatedTemplate);
 
     if (selectedElement && 'rows' in selectedElement && selectedElement.order === columnId) {
       setSelectedElement(null);
@@ -355,7 +483,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
 
       // Clear history and start fresh with the imported template
       clearHistory();
-      addToHistory(parsed);
+      addHistoryEntry(parsed);
     } catch (e) {
       console.error('Failed to parse template JSON:', e);
       throw new Error('Invalid template format');
@@ -480,7 +608,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
           };
 
           setTemplate(updatedTemplate);
-          addToHistory(updatedTemplate);
+          addHistoryEntry(updatedTemplate);
           return;
         }
       }
@@ -494,80 +622,136 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
   } | null>(null);
 
   // Table column properties update
-  const updateTableColumnProps = (elementId: string, columnId: string, props: Partial<ElementProps>) => {
-    // Create a deep copy to avoid mutation
-    const updatedTemplate = deepCopy(template);
+  const updateTableColumnProps = useCallback((elementId: string, columnId: string, props: Partial<ElementProps> & { name?: string }) => {
+    setTemplate(prevTemplate => {
+      const newTemplate = deepCopy(prevTemplate);
+      let found = false;
 
-    // Find the element
-    for (const column of updatedTemplate.columns) {
-      for (const row of column.rows) {
-        const element = row.elements.find(el => el.id === elementId);
-
-        if (element && element.type === 'table' && Array.isArray(element.values) && element.values[0]?.columns) {
-          const tableData = element.values[0];
-
-          // Update the column properties
-          const updatedColumns = tableData.columns.map(col => {
-            if (col.id === columnId) {
-              return {
-                ...col,
-                props: { ...col.props, ...props }
-              };
+      // Extract name from props if present
+      const { name, ...otherProps } = props as any;
+      
+      for (let c = 0; c < newTemplate.columns.length && !found; c++) {
+        const column = newTemplate.columns[c];
+        
+        for (let r = 0; r < column.rows.length && !found; r++) {
+          const row = column.rows[r];
+          
+          const elementIndex = row.elements.findIndex(el => el.id === elementId);
+          if (elementIndex >= 0 && row.elements[elementIndex].type === 'table') {
+            const element = row.elements[elementIndex];
+            
+            if (Array.isArray(element.values) && element.values.length > 0) {
+              const tableData = { ...element.values[0] };
+              
+              // Find the column in the table
+              const columnIndex = tableData.columns.findIndex(col => col.id === columnId);
+              if (columnIndex >= 0) {
+                // Update column props
+                const updatedColumn = {
+                  ...tableData.columns[columnIndex],
+                  props: {
+                    ...tableData.columns[columnIndex].props,
+                    ...otherProps
+                  }
+                };
+                
+                // Add name if provided
+                if (name !== undefined) {
+                  updatedColumn.name = name;
+                }
+                
+                // Update the table data
+                tableData.columns = [
+                  ...tableData.columns.slice(0, columnIndex),
+                  updatedColumn,
+                  ...tableData.columns.slice(columnIndex + 1)
+                ];
+                
+                // Update the element values
+                element.values = [tableData];
+                
+                found = true;
+                break;
+              }
             }
-            return col;
-          });
-
-          // Update the table data
-          element.values[0] = {
-            ...tableData,
-            columns: updatedColumns
-          };
-
-          setTemplate(updatedTemplate);
-          addToHistory(updatedTemplate);
-          return;
+          }
         }
       }
-    }
-  };
+      
+      // Add to history if found and updated
+      if (found) {
+        addHistoryEntry(newTemplate);
+      }
+      
+      return newTemplate;
+    });
+  }, [addHistoryEntry]);
 
   // Table row properties update
-  const updateTableRowProps = (elementId: string, rowId: string, props: Partial<ElementProps>) => {
-    // Create a deep copy to avoid mutation
-    const updatedTemplate = deepCopy(template);
-
-    // Find the element
-    for (const column of updatedTemplate.columns) {
-      for (const row of column.rows) {
-        const element = row.elements.find(el => el.id === elementId);
-
-        if (element && element.type === 'table' && Array.isArray(element.values) && element.values[0]?.rows) {
-          const tableData = element.values[0];
-
-          // Update the row properties
-          const updatedRows = tableData.rows.map(tableRow => {
-            if (tableRow.id === rowId) {
-              return {
-                ...tableRow,
-                props: { ...tableRow.props, ...props }
-              };
+  const updateTableRowProps = useCallback((elementId: string, rowId: string, props: Partial<ElementProps> & { title?: string }) => {
+    setTemplate(prevTemplate => {
+      const newTemplate = deepCopy(prevTemplate);
+      let found = false;
+      
+      // Extract title from props if present
+      const { title, ...otherProps } = props as any;
+      
+      for (let c = 0; c < newTemplate.columns.length && !found; c++) {
+        const column = newTemplate.columns[c];
+        
+        for (let r = 0; r < column.rows.length && !found; r++) {
+          const row = column.rows[r];
+          
+          const elementIndex = row.elements.findIndex(el => el.id === elementId);
+          if (elementIndex >= 0 && row.elements[elementIndex].type === 'table') {
+            const element = row.elements[elementIndex];
+            
+            if (Array.isArray(element.values) && element.values.length > 0) {
+              const tableData = { ...element.values[0] };
+              
+              // Find the row in the table
+              const tableRowIndex = tableData.rows.findIndex(tr => tr.id === rowId);
+              if (tableRowIndex >= 0) {
+                // Update row props
+                const updatedRow = {
+                  ...tableData.rows[tableRowIndex],
+                  props: {
+                    ...tableData.rows[tableRowIndex].props,
+                    ...otherProps
+                  }
+                };
+                
+                // Add title if provided
+                if (title !== undefined) {
+                  updatedRow.title = title || undefined; // Don't store empty strings
+                }
+                
+                // Update the table data
+                tableData.rows = [
+                  ...tableData.rows.slice(0, tableRowIndex),
+                  updatedRow,
+                  ...tableData.rows.slice(tableRowIndex + 1)
+                ];
+                
+                // Update the element values
+                element.values = [tableData];
+                
+                found = true;
+                break;
+              }
             }
-            return tableRow;
-          });
-
-          // Update the table data
-          element.values[0] = {
-            ...tableData,
-            rows: updatedRows
-          };
-
-          setTemplate(updatedTemplate);
-          addToHistory(updatedTemplate);
-          return;
+          }
         }
       }
-    }
-  };
+      
+      // Add to history if found and updated
+      if (found) {
+        addHistoryEntry(newTemplate);
+      }
+      
+      return newTemplate;
+    });
+  }, [addHistoryEntry]);
 
   // Delete table column
   const deleteTableColumn = (elementId: string, columnId: string) => {
@@ -607,7 +791,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
           };
 
           setTemplate(updatedTemplate);
-          addToHistory(updatedTemplate);
+          addHistoryEntry(updatedTemplate);
 
           // Clear selection if the deleted column was selected
           if (selectedTableElement &&
@@ -651,7 +835,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
           };
 
           setTemplate(updatedTemplate);
-          addToHistory(updatedTemplate);
+          addHistoryEntry(updatedTemplate);
 
           // Clear selection if the deleted row was selected
           if (selectedTableElement &&
@@ -713,7 +897,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
 
       // Update the template
       setTemplate(updatedTemplate);
-      addToHistory(updatedTemplate);
+      addHistoryEntry(updatedTemplate);
       setSelectedElement(null);
     }
   };
@@ -835,7 +1019,7 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     // Update the template
     setTemplate(updatedTemplate);
-    addToHistory(updatedTemplate);
+    addHistoryEntry(updatedTemplate);
     setSelectedElement(newElement);
   };
 
@@ -886,7 +1070,10 @@ export const TemplateProvider: React.FC<{ children: ReactNode }> = ({ children }
         copyElement,
         pasteElement,
         canPaste: clipboardElement !== null,
-        duplicateElement
+        duplicateElement,
+        updateElementTitle,
+        updateColumnTitle,
+        updateRowTitle
       }}
     >
       {children}

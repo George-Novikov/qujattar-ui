@@ -1,5 +1,3 @@
-// Update your Tree.tsx component to handle table sub-elements
-
 import React from 'react';
 import { useTemplate } from '../../context/TemplateContext';
 import { useAppSettings } from '../../context/AppSettingsContext';
@@ -21,7 +19,7 @@ const Tree: React.FC = () => {
   }
   
   // Find table data for rendering sub-elements
-  const findTableData = (elementId) => {
+  const findTableData = (elementId: string) => {
     for (const column of template.columns) {
       for (const row of column.rows) {
         const element = row.elements.find(el => el.id === elementId);
@@ -31,6 +29,11 @@ const Tree: React.FC = () => {
       }
     }
     return null;
+  };
+  
+  // Get element title or default label
+  const getElementTitle = (element: any, defaultLabel: string) => {
+    return element.title || defaultLabel;
   };
   
   return (
@@ -55,7 +58,7 @@ const Tree: React.FC = () => {
           {template.columns.map(column => (
             <TreeItem
               key={`column-${column.order}`}
-              label={`Column ${column.order + 1}`}
+              label={getElementTitle(column, `Column ${column.order + 1}`)}
               isSelected={selectedElement === column}
               isExpanded={true}
               onClick={() => {
@@ -67,7 +70,7 @@ const Tree: React.FC = () => {
               {column.rows.map(row => (
                 <TreeItem
                   key={`row-${column.order}-${row.order}`}
-                  label={`Row ${row.order + 1}`}
+                  label={getElementTitle(row, `Row ${row.order + 1}`)}
                   isSelected={selectedElement === row}
                   isExpanded={true}
                   onClick={() => {
@@ -79,15 +82,16 @@ const Tree: React.FC = () => {
                   {row.elements.map(element => {
                     const isTableElement = element.type === 'table';
                     const tableData = isTableElement ? findTableData(element.id) : null;
+                    const defaultLabel = `${element.type.charAt(0).toUpperCase() + element.type.slice(1)} ${element.id.split('-')[1]}`;
                     
                     return (
                       <TreeItem
                         key={element.id}
-                        label={`${element.type.charAt(0).toUpperCase() + element.type.slice(1)} ${element.id.split('-')[1]}`}
+                        label={getElementTitle(element, defaultLabel)}
                         isSelected={selectedElement && 'id' in selectedElement && selectedElement.id === element.id && !selectedTableElement}
                         isExpanded={isTableElement && tableData && 
-                          // @ts-ignore
-                          (selectedElement?.id === element.id || selectedTableElement?.elementId === element.id)}
+                          ((selectedElement && 'id' in selectedElement && selectedElement.id === element.id) || 
+                           (selectedTableElement && selectedTableElement.elementId === element.id))}
                         onClick={() => {
                           setSelectedElement(element);
                           setSelectedTableElement(null);
@@ -101,7 +105,7 @@ const Tree: React.FC = () => {
                               label="Columns"
                               isExpanded={true}
                             >
-                              {tableData.columns.map((col) => (
+                              {tableData.columns.map((col: any) => (
                                 <TreeItem
                                   key={col.id}
                                   label={col.name}
@@ -125,10 +129,10 @@ const Tree: React.FC = () => {
                               label="Rows"
                               isExpanded={true}
                             >
-                              {tableData.rows.map((tableRow, index) => (
+                              {tableData.rows.map((tableRow: any, index: number) => (
                                 <TreeItem
                                   key={tableRow.id}
-                                  label={`Row ${index + 1}`}
+                                  label={tableRow.title || `Row ${index + 1}`}
                                   isSelected={selectedTableElement?.elementId === element.id && 
                                               selectedTableElement?.type === 'row' && 
                                               selectedTableElement?.id === tableRow.id}
